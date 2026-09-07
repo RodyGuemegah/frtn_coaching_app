@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "860489775317",
+    "project_id": "frtn-coaching-app",
+    "storage_bucket": "frtn-coaching-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:860489775317:android:84a2e7f9e70a1aeb918a5c",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0GXypbPWdDvSyAEPf6Llw2UexLng4c6M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
