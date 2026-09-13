@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function profileOf(uid) { return get(/databases/$(database)/documents/users/$(uid)).data; }
+    function isCoach() { return signedIn() && profileOf(me()).role == 'coach'; }
+    function isCoachOf(uid) { return signedIn() && profileOf(uid).coachId == me(); }
+    function changedKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    match /users/{uid} {
+      // Soi-même, ou le coach de cet élève (permet aussi la requête where('coachId' == moi)).
+      allow read: if signedIn() && (me() == uid || resource.data.coachId == me());
+
+      // Seul un coach crée un profil, forcément 'eleve' et rattaché à lui.
+      // Aucun moyen de créer un profil 'coach' depuis l'app : bootstrap manuel dans la console.
+      allow create: if isCoach()
+        && request.resource.data.role == 'eleve'
+        && request.resource.data.coachId == me()
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string;
+
+      // L'élève modifie ses infos (jamais role / coachId / email) ;
+      // le coach modifie ses élèves (jamais role / coachId).
+      allow update: if (me() == uid && !changedKeys().hasAny(['role', 'coachId', 'email']))
+        || (isCoach() && resource.data.coachId == me() && !changedKeys().hasAny(['role', 'coachId']));
+
+      allow delete: if false;
+
+      match /sessions/{sid} {
+        allow read: if signedIn() && (me() == uid || isCoachOf(uid));
+
+        allow create: if isCoachOf(uid)
+          && request.resource.data.studentId == uid
+          && request.resource.data.coachId == me()
+          && request.resource.data.status in ['todo', 'done'];
+
+        // Coach : tout ; élève : uniquement status / feedback / doneAt.
+        allow update: if isCoachOf(uid)
+          || (me() == uid
+              && changedKeys().hasOnly(['status', 'feedback', 'doneAt'])
+              && request.resource.data.status in ['todo', 'done']);
+
+        allow delete: if isCoachOf(uid);
+      }
+
+      match /meals/{mid} {
+        allow read: if signedIn() && (me() == uid || isCoachOf(uid));
+        allow create, delete: if isCoachOf(uid);
+        allow update: if isCoachOf(uid)
+          || (me() == uid && changedKeys().hasOnly(['eaten']));
+      }
+    }
+
+    // Requête collectionGroup('sessions') du dashboard coach (filtrée par coachId).
+    match /{path=**}/sessions/{sid} {
+      allow read: if signedIn() && resource.data.coachId == me();
+    }
+  }
+}

@@ -102,7 +102,10 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final disabled = onPressed == null && !loading;
+    return Opacity(
+      opacity: disabled ? 0.45 : 1,
+      child: SizedBox(
       height: 50,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -134,6 +137,123 @@ class PrimaryButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+      ),
+    );
+  }
+}
+
+/// Carte d'erreur (bordure accent) avec bouton « Réessayer » optionnel.
+class ErrorCard extends StatelessWidget {
+  final String message;
+  final VoidCallback? onRetry;
+
+  const ErrorCard({super.key, required this.message, this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.accent),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: AppColors.accent),
+          const SizedBox(width: 12),
+          Expanded(child: Text(message, style: const TextStyle(color: AppColors.text, fontSize: 13))),
+          if (onRetry != null)
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('Réessayer', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Ligne d'exercice numérotée (badge + nom + détail), façon maquette.
+class ExerciseRow extends StatelessWidget {
+  final int index;
+  final String name;
+  final String detail;
+  final Widget? trailing;
+
+  const ExerciseRow({super.key, required this.index, required this.name, required this.detail, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AppCard(
+        decoration: BoxDecoration(color: AppColors.panel, borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(color: AppColors.card2, borderRadius: BorderRadius.circular(9)),
+              alignment: Alignment.center,
+              child: Text('$index', style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 13)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: const TextStyle(color: AppColors.text, fontSize: 14.5, fontWeight: FontWeight.w700)),
+                  if (detail.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(detail, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                  ],
+                ],
+              ),
+            ),
+            ?trailing,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+enum AvatarStyle { accent, grey, bordered }
+
+/// Avatar rond avec initiales, façon maquette (variantes accent / grise / bordée).
+class InitialsAvatar extends StatelessWidget {
+  final String initials;
+  final double radius;
+  final AvatarStyle style;
+
+  const InitialsAvatar(this.initials, {super.key, this.radius = 21, this.style = AvatarStyle.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    late final Gradient gradient;
+    Border? border;
+    switch (style) {
+      case AvatarStyle.accent:
+        gradient = const LinearGradient(colors: [AppColors.accent, AppColors.accentDark]);
+        break;
+      case AvatarStyle.grey:
+        gradient = const LinearGradient(colors: [Color(0xFF55555E), Color(0xFF2C2C33)]);
+        break;
+      case AvatarStyle.bordered:
+        gradient = const LinearGradient(colors: [Color(0xFF3A3A42), Color(0xFF0F0F12)]);
+        border = Border.all(color: AppColors.accent, width: 2);
+        break;
+    }
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(shape: BoxShape.circle, gradient: gradient, border: border),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: radius * 0.62),
       ),
     );
   }

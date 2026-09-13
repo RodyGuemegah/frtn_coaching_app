@@ -1,1 +1,45 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"frtn-coaching-app","appId":"1:860489775317:android:84a2e7f9e70a1aeb918a5c","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"frtn-coaching-app","appId":"1:860489775317:ios:2eedfff1ccd654cf918a5c","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"frtn-coaching-app","appId":"1:860489775317:ios:54a7c39ae8888198918a5c","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"frtn-coaching-app","configurations":{"android":"1:860489775317:android:84a2e7f9e70a1aeb918a5c","ios":"1:860489775317:ios:2eedfff1ccd654cf918a5c","macos":"1:860489775317:ios:54a7c39ae8888198918a5c","web":"1:860489775317:web:3a6deef528ed7ea1918a5c","windows":"1:860489775317:web:f28543aaba4eb081918a5c"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "frtn-coaching-app",
+          "appId": "1:860489775317:android:84a2e7f9e70a1aeb918a5c",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "frtn-coaching-app",
+          "appId": "1:860489775317:ios:2eedfff1ccd654cf918a5c",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "frtn-coaching-app",
+          "appId": "1:860489775317:ios:54a7c39ae8888198918a5c",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "frtn-coaching-app",
+          "configurations": {
+            "android": "1:860489775317:android:84a2e7f9e70a1aeb918a5c",
+            "ios": "1:860489775317:ios:2eedfff1ccd654cf918a5c",
+            "macos": "1:860489775317:ios:54a7c39ae8888198918a5c",
+            "web": "1:860489775317:web:3a6deef528ed7ea1918a5c",
+            "windows": "1:860489775317:web:f28543aaba4eb081918a5c"
+          }
+        }
+      }
+    }
+  }
+}

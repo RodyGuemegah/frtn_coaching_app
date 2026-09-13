@@ -1,16 +1,23 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../models/app_user.dart';
+import '../models/meal_model.dart';
 import '../models/session_model.dart';
+import '../services/meal_service.dart';
 import '../services/session_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/errors.dart';
+import '../utils/format.dart';
+import '../utils/session_stats.dart';
 import '../widgets/cartes.dart';
+import '../widgets/current_user_scope.dart';
 import '../widgets/tags.dart';
 import 'nutrition.dart';
 import 'planning.dart';
 import 'profil.dart';
+import 'session_detail.dart';
 import 'sessions_screen.dart';
 
-/// Coquille de l'app connectée : contenu de l'onglet + barre de navigation basse.
+/// Coquille de l'app élève : contenu de l'onglet + barre de navigation basse.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -20,14 +27,15 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
 
-  void _goToProfil() => setState(() => _index = 4);
+  void _openTab(int i) => setState(() => _index = i);
 
   @override
   Widget build(BuildContext context) {
+    final user = CurrentUserScope.of(context);
     final tabs = [
-      _HomeTab(onAvatarTap: _goToProfil),
-      const SessionsScreen(),
-      const NutritionScreen(),
+      _HomeTab(user: user, onOpenTab: _openTab),
+      SessionsScreen(uid: user.uid),
+      NutritionScreen(uid: user.uid),
       const PlanningScreen(),
       const ProfilScreen(),
     ];
@@ -35,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(child: IndexedStack(index: _index, children: tabs)),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: _openTab,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Accueil'),
           NavigationDestination(icon: Icon(Icons.fitness_center_outlined), selectedIcon: Icon(Icons.fitness_center), label: 'Séances'),
@@ -48,24 +56,30 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _HomeTab extends StatelessWidget {
-  final VoidCallback onAvatarTap;
-  const _HomeTab({required this.onAvatarTap});
+class _HomeTab extends StatefulWidget {
+  final AppUser user;
+  final void Function(int tab) onOpenTab;
+  const _HomeTab({required this.user, required this.onOpenTab});
+
+  @override
+  State<_HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<_HomeTab> {
+  late final Stream<List<SessionModel>> _sessions = SessionService().watchSessions(widget.user.uid);
+  late final Stream<List<MealModel>> _meals = MealService().watchTodayMeals(widget.user.uid);
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final displayName = (user?.displayName?.trim().isNotEmpty ?? false)
-        ? user!.displayName!.trim().split(' ').first
-        : (user?.email?.split('@').first ?? 'Champion');
-    final initials = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
-
+    final user = widget.user;
     return StreamBuilder<List<SessionModel>>(
-      stream: SessionService().watchSessions(),
+      stream: _sessions,
       builder: (context, snapshot) {
+        final now = DateTime.now();
         final sessions = snapshot.data ?? const <SessionModel>[];
-        final nextSession = _nextSession(sessions);
-        final weekCount = _thisWeekCount(sessions);
+        final next = nextSession(sessions, now);
+        final week = weekCount(sessions, now);
+        final attendance = monthAttendancePct(sessions, now);
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
@@ -77,57 +91,94 @@ class _HomeTab extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Salut $displayName 👋',
+                      Text('Salut ${user.shortName} 👋',
                           style: const TextStyle(color: AppColors.text, fontSize: 21, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 2),
-                      Text(_todayLabel(), style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                      Text(todayLabel(now), style: const TextStyle(color: AppColors.muted, fontSize: 12)),
                     ],
                   ),
                 ),
-                GestureDetector(
-                  onTap: onAvatarTap,
-                  child: CircleAvatar(
-                    radius: 21,
-                    backgroundColor: AppColors.accentDark,
-                    child: Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                  ),
-                ),
+                GestureDetector(onTap: () => widget.onOpenTab(4), child: InitialsAvatar(user.initials)),
               ],
             ),
             const SizedBox(height: 18),
-            if (snapshot.connectionState == ConnectionState.waiting)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (nextSession == null)
-              const AppCard(
-                child: Text('Aucune séance à venir pour le moment.', style: TextStyle(color: AppColors.muted)),
-              )
+            if (snapshot.hasError)
+              ErrorCard(message: friendlyErrorMessage(snapshot.error!))
+            else if (snapshot.connectionState == ConnectionState.waiting)
+              const Padding(padding: EdgeInsets.symmetric(vertical: 32), child: Center(child: CircularProgressIndicator()))
+            else if (next == null)
+              const AppCard(child: Text('Aucune séance à venir pour le moment.', style: TextStyle(color: AppColors.muted)))
             else
-              _NextSessionCard(session: nextSession),
+              _NextSessionCard(session: next, onOpen: () => _openSession(next)),
             const SizedBox(height: 14),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.5,
-              children: [
-                StatTile(value: weekCount, label: 'Séances cette semaine'),
-                const StatTile(value: '—', label: 'Assiduité du mois'),
-                const StatTile(value: '—', label: 'Objectif kcal / jour'),
-                const StatTile(value: '—', label: 'Depuis le début'),
-              ],
+            StreamBuilder<List<MealModel>>(
+              stream: _meals,
+              builder: (context, mealSnap) {
+                final meals = mealSnap.data ?? const <MealModel>[];
+                final kcalTarget = meals.fold<int>(0, (sum, m) => sum + m.kcal);
+                return GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.5,
+                  children: [
+                    StatTile(value: '${week.done}/${week.total}', label: 'Séances cette semaine'),
+                    StatTile(value: attendance == null ? '—' : '$attendance%', label: 'Assiduité du mois'),
+                    StatTile(value: kcalTarget > 0 ? '$kcalTarget' : '—', label: 'Objectif kcal / jour'),
+                    StatTile(value: '${totalDone(sessions)}', label: 'Séances complétées'),
+                  ],
+                );
+              },
             ),
             const SectionLabel('Prochains repas'),
-            AppCard(
-              onTap: () {},
-              child: const Text(
-                'Le programme alimentaire arrive bientôt 🥗',
-                style: TextStyle(color: AppColors.muted),
-              ),
+            StreamBuilder<List<MealModel>>(
+              stream: _meals,
+              builder: (context, mealSnap) {
+                if (mealSnap.hasError) return ErrorCard(message: friendlyErrorMessage(mealSnap.error!));
+                final meals = mealSnap.data ?? const <MealModel>[];
+                final upcoming = meals.where((m) => !m.eaten).toList();
+                if (upcoming.isEmpty) {
+                  return AppCard(
+                    onTap: () => widget.onOpenTab(2),
+                    child: Text(
+                      meals.isEmpty ? "Aucun repas prévu aujourd'hui." : 'Tous les repas du jour sont cochés ✓',
+                      style: const TextStyle(color: AppColors.muted),
+                    ),
+                  );
+                }
+                return Column(
+                  children: [
+                    for (final m in upcoming.take(2))
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: AppCard(
+                          onTap: () => widget.onOpenTab(2),
+                          child: Row(
+                            children: [
+                              const Text('🍽️', style: TextStyle(fontSize: 22)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(m.time.isEmpty ? m.title : '${m.title} · ${m.time}',
+                                        style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700)),
+                                    const SizedBox(height: 2),
+                                    Text('${m.kcal} kcal · ${m.protein} g protéines',
+                                        style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right, color: AppColors.muted),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ],
         );
@@ -135,39 +186,25 @@ class _HomeTab extends StatelessWidget {
     );
   }
 
-  String _todayLabel() {
-    const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
-    const mois = [
-      'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-      'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
-    ];
-    final now = DateTime.now();
-    return '${jours[now.weekday - 1]} ${now.day} ${mois[now.month - 1]}';
-  }
-
-  SessionModel? _nextSession(List<SessionModel> sessions) {
-    final upcoming = sessions.where((s) => s.status != 'done').toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
-    return upcoming.isNotEmpty ? upcoming.first : null;
-  }
-
-  String _thisWeekCount(List<SessionModel> sessions) {
-    final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
-    final endOfWeek = startOfWeek.add(const Duration(days: 7));
-    final thisWeek = sessions.where((s) => s.date.isAfter(startOfWeek) && s.date.isBefore(endOfWeek));
-    final done = thisWeek.where((s) => s.status == 'done').length;
-    return '$done/${thisWeek.length}';
+  void _openSession(SessionModel s) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => SessionDetailScreen(uid: widget.user.uid, session: s)),
+    );
   }
 }
 
 class _NextSessionCard extends StatelessWidget {
   final SessionModel session;
-  const _NextSessionCard({required this.session});
+  final VoidCallback onOpen;
+  const _NextSessionCard({required this.session, required this.onOpen});
 
   @override
   Widget build(BuildContext context) {
-    final isToday = _isToday(session.date);
+    final s = session;
+    final details = <String>[
+      '${s.exercises.length} exercice${s.exercises.length > 1 ? 's' : ''}',
+      if (s.durationMin != null) '~${s.durationMin} min',
+    ];
     return AppCard(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -181,27 +218,15 @@ class _NextSessionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TagChip(
-            isToday ? "Aujourd'hui · ${_time(session.date)}" : '${_dateLabel(session.date)} · ${_time(session.date)}',
-            style: TagStyle.today,
-          ),
+          Align(alignment: Alignment.centerLeft, child: TagChip(sessionDateTag(s.date), style: TagStyle.today)),
           const SizedBox(height: 8),
-          Text(session.title, style: const TextStyle(color: AppColors.text, fontSize: 17, fontWeight: FontWeight.w700)),
+          Text(s.title, style: const TextStyle(color: AppColors.text, fontSize: 17, fontWeight: FontWeight.w700)),
           const SizedBox(height: 2),
-          Text('${session.exercises.length} exercices', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+          Text(details.join(' · '), style: const TextStyle(color: AppColors.muted, fontSize: 12)),
           const SizedBox(height: 14),
-          PrimaryButton(label: 'Voir la séance →', onPressed: () {}),
+          PrimaryButton(label: 'Voir la séance →', onPressed: onOpen),
         ],
       ),
     );
   }
-
-  bool _isToday(DateTime d) {
-    final now = DateTime.now();
-    return d.year == now.year && d.month == now.month && d.day == now.day;
-  }
-
-  String _time(DateTime d) => '${d.hour.toString().padLeft(2, '0')}h${d.minute.toString().padLeft(2, '0')}';
-
-  String _dateLabel(DateTime d) => '${d.day}/${d.month}';
 }

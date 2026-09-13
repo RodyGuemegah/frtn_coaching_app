@@ -26,17 +26,35 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (_loading) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() {
       _loading = true;
       _error = null;
     });
-    final error = await _auth.signIn(_email.text.trim(), _password.text.trim());
+    try {
+      final error = await _auth.signIn(_email.text.trim(), _password.text);
+      if (!mounted) return;
+      setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      setState(() => _error = 'Saisis ton email pour recevoir un lien de réinitialisation');
+      return;
+    }
+    final error = await _auth.sendPasswordReset(email);
     if (!mounted) return;
-    setState(() {
-      _loading = false;
-      _error = error;
-    });
+    setState(() => _error = error);
+    if (error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Si un compte existe pour cet email, un lien vient d\'être envoyé.')),
+      );
+    }
   }
 
   @override
@@ -87,6 +105,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 36),
                       _buildForm(),
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: _loading ? null : _forgotPassword,
+                        child: const Text('Mot de passe oublié ?', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Accès élève fourni par ton coach',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 11),
+                      ),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -145,6 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
             TextFormField(
               controller: _email,
               keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
                 labelText: 'Email',
@@ -156,6 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
             TextFormField(
               controller: _password,
               obscureText: _obscure,
+              autofillHints: const [AutofillHints.password],
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: 'Mot de passe',

@@ -1,11 +1,19 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter_application_app/services/auth_service.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
 import 'firebase_options.dart';
+import 'models/app_user.dart';
+import 'screens/coach/coach_home.dart';
 import 'screens/home.dart';
 import 'screens/login.dart';
-import 'theme/app_colors.dart';
+import 'services/auth_service.dart';
+import 'services/user_service.dart';
+import 'theme/app_theme.dart';
+import 'utils/errors.dart';
+import 'widgets/cartes.dart';
+import 'widgets/current_user_scope.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,58 +31,125 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'FRTN Coaching',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: AppColors.background,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.accent,
-          brightness: Brightness.dark,
-        ),
-        navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: AppColors.panel,
-          indicatorColor: AppColors.accent.withValues(alpha: 0.16),
-          iconTheme: WidgetStateProperty.resolveWith(
-            (states) => IconThemeData(
-              color: states.contains(WidgetState.selected) ? AppColors.accent : AppColors.muted,
+      locale: const Locale('fr'),
+      supportedLocales: const [Locale('fr')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      theme: buildAppTheme(),
+      home: const AuthGate(),
+    );
+  }
+}
+
+/// Étape 1 : état d'authentification Firebase → Login ou RoleGate.
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  Stream<User?> _auth = AuthService().authStateChanges;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: _auth,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _FullScreenMessage(
+            message: friendlyErrorMessage(snapshot.error!),
+            action: GhostButton(
+              label: 'Réessayer',
+              onPressed: () => setState(() => _auth = AuthService().authStateChanges),
+            ),
+          );
+        }
+        if (snapshot.connectionState == ConnectionState.waiting) return const _Splash();
+        final user = snapshot.data;
+        if (user == null) return const LoginScreen();
+        return RoleGate(key: ValueKey(user.uid), user: user);
+      },
+    );
+  }
+}
+
+/// Étape 2 : profil Firestore (`users/{uid}`) → espace coach ou espace élève.
+/// Sans document (compte historique), l'utilisateur est traité comme élève.
+class RoleGate extends StatefulWidget {
+  final User user;
+  const RoleGate({super.key, required this.user});
+
+  @override
+  State<RoleGate> createState() => _RoleGateState();
+}
+
+class _RoleGateState extends State<RoleGate> {
+  late final Stream<AppUser?> _profile = UserService().watchUser(widget.user.uid);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<AppUser?>(
+      stream: _profile,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _FullScreenMessage(
+            message: friendlyErrorMessage(snapshot.error!),
+            action: GhostButton(label: 'Se déconnecter', onPressed: () => AuthService().signOut()),
+          );
+        }
+        if (snapshot.connectionState == ConnectionState.waiting) return const _Splash();
+        final profile = snapshot.data ??
+            AppUser.fallback(
+              uid: widget.user.uid,
+              email: widget.user.email,
+              displayName: widget.user.displayName,
+            );
+        return CurrentUserScope(
+          user: profile,
+          child: profile.isCoach ? const CoachShell() : const HomeScreen(),
+        );
+      },
+    );
+  }
+}
+
+class _Splash extends StatelessWidget {
+  const _Splash();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+  }
+}
+
+class _FullScreenMessage extends StatelessWidget {
+  final String message;
+  final Widget action;
+  const _FullScreenMessage({required this.message, required this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ErrorCard(message: message),
+                const SizedBox(height: 16),
+                action,
+              ],
             ),
           ),
-          labelTextStyle: WidgetStateProperty.resolveWith(
-            (states) => TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: states.contains(WidgetState.selected) ? AppColors.accent : AppColors.muted,
-            ),
-          ),
         ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.05),
-          labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
-          iconColor: Colors.white.withValues(alpha: 0.5),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: AppColors.accent, width: 1.4),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.redAccent, width: 1.2),
-          ),
-        ),
-      ),
-      home: StreamBuilder<User?>(
-        stream: AuthService().authStateChanges,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
-          }
-          return snapshot.hasData ? const HomeScreen() : const LoginScreen();
-        },
       ),
     );
   }
