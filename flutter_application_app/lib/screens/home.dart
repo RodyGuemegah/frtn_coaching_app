@@ -157,7 +157,7 @@ class _HomeTabState extends State<_HomeTab> {
                           onTap: () => widget.onOpenTab(2),
                           child: Row(
                             children: [
-                              const Text('🍽️', style: TextStyle(fontSize: 22)),
+                              Text(mealEmoji(m.title), style: const TextStyle(fontSize: 22)),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
@@ -166,7 +166,10 @@ class _HomeTabState extends State<_HomeTab> {
                                     Text(m.time.isEmpty ? m.title : '${m.title} · ${m.time}',
                                         style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700)),
                                     const SizedBox(height: 2),
-                                    Text('${m.kcal} kcal · ${m.protein} g protéines',
+                                    Text(
+                                        m.description != null
+                                            ? '${m.description} — ${m.kcal} kcal'
+                                            : '${m.kcal} kcal · ${m.protein} g protéines',
                                         style: const TextStyle(color: AppColors.muted, fontSize: 12)),
                                   ],
                                 ),

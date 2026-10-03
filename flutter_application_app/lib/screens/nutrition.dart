@@ -4,6 +4,7 @@ import '../services/meal_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/errors.dart';
 import '../widgets/cartes.dart';
+import '../widgets/meal_widgets.dart';
 
 class NutritionScreen extends StatefulWidget {
   final String uid;
@@ -126,25 +127,35 @@ class _MealRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: AppCard(
         onTap: onTap,
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(m.time.isEmpty ? m.title : '${m.title} · ${m.time}',
-                      style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 2),
-                  Text('${m.kcal} kcal · ${m.protein} g prot. · ${m.carbs} g gluc. · ${m.fat} g lip.',
-                      style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-                ],
-              ),
+            Row(
+              children: [
+                Text(mealEmoji(m.title), style: const TextStyle(fontSize: 24)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(m.time.isEmpty ? m.title : '${m.title} · ${m.time}',
+                          style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700)),
+                      if (m.description != null) ...[
+                        const SizedBox(height: 2),
+                        Text(m.description!, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  m.eaten ? Icons.check_circle : Icons.radio_button_unchecked,
+                  color: m.eaten ? AppColors.accent : AppColors.muted,
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Icon(
-              m.eaten ? Icons.check_circle : Icons.radio_button_unchecked,
-              color: m.eaten ? AppColors.accent : AppColors.muted,
-            ),
+            const SizedBox(height: 10),
+            MacroChips.ofMeal(m),
           ],
         ),
       ),

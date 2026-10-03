@@ -11,6 +11,7 @@ import '../../widgets/tags.dart';
 import '../session_detail.dart';
 import '../sessions_screen.dart';
 import 'coach_create_session.dart';
+import 'coach_meal_plan.dart';
 
 /// Fiche élève côté coach : stats, dernier retour, séances, actions rapides.
 class CoachStudentDetailScreen extends StatefulWidget {
@@ -138,8 +139,10 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
               ),
               const SizedBox(height: 10),
               AppCard(
-                onTap: () => _snack('Plan alimentaire — bientôt disponible'),
-                child: _actionRow('🥗', 'Modifier le plan alimentaire', 'Bientôt disponible'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => CoachMealPlanScreen(student: student)),
+                ),
+                child: _actionRow('🥗', 'Plan alimentaire', 'Repas jour par jour, macros, duplication'),
               ),
               const SizedBox(height: 10),
               AppCard(
