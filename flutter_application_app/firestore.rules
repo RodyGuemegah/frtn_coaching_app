@@ -45,6 +45,11 @@ service cloud.firestore {
         allow delete: if isCoachOf(uid);
       }
 
+      // Modèles de séances : bibliothèque privée de chaque coach.
+      match /templates/{tid} {
+        allow read, write: if signedIn() && me() == uid && isCoach();
+      }
+
       match /meals/{mid} {
         allow read: if signedIn() && (me() == uid || isCoachOf(uid));
         allow create, delete: if isCoachOf(uid);

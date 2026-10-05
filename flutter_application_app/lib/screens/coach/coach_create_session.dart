@@ -9,6 +9,7 @@ import '../../widgets/cartes.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/current_user_scope.dart';
 import 'coach_add_student.dart';
+import 'template_picker.dart';
 import '../../theme/app_text.dart';
 
 /// Version « page » (route poussée, avec AppBar) du formulaire.
@@ -125,6 +126,38 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
     setState(() => _when = DateTime(base.year, base.month, base.day, time.hour, time.minute));
   }
 
+  /// « Partir d'un modèle » : pré-remplit titre, durée, consigne et exercices.
+  /// L'élève et la date choisis ne sont pas touchés.
+  Future<void> _applyTemplate() async {
+    final coach = CurrentUserScope.of(context);
+    final template = await showTemplatePicker(context, coachUid: coach.uid);
+    if (template == null || !mounted) return;
+
+    // Demande confirmation avant d'écraser un formulaire déjà commencé.
+    final hasContent = _title.text.trim().isNotEmpty || _exercises.isNotEmpty || _note.text.trim().isNotEmpty;
+    if (hasContent) {
+      final ok = await showConfirmDialog(
+        context,
+        title: 'Remplacer le contenu ?',
+        message: 'Le titre, la durée, la consigne et les exercices déjà saisis seront remplacés par ceux de « ${template.title} ».',
+        confirmLabel: 'Remplacer',
+        destructive: false,
+      );
+      if (!ok || !mounted) return;
+    }
+
+    setState(() {
+      _title.text = template.title;
+      _duration.text = template.durationMin?.toString() ?? '';
+      _note.text = template.coachNote ?? '';
+      _exercises
+        ..clear()
+        ..addAll(template.exercises); // copie : modifier le formulaire ne touche pas le modèle
+      _error = null;
+    });
+    showToast(context, 'Modèle « ${template.title} » appliqué', type: ToastType.info);
+  }
+
   Future<void> _addExercise() async {
     final ex = await showDialog<Exercise>(context: context, builder: (_) => const _ExerciseDialog());
     if (ex != null) setState(() => _exercises.add(ex));
@@ -228,6 +261,10 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
             "Cette séance est déjà faite. Tes modifications n'effaceront pas le ressenti de l'élève.",
             icon: Icons.check_circle_outline_rounded,
           ),
+        ],
+        if (!_editing) ...[
+          const SizedBox(height: 14),
+          GhostButton(label: '📚 Partir d\'un modèle', onPressed: _applyTemplate),
         ],
         const _FieldLabel('Élève'),
         if (widget.students.isEmpty)

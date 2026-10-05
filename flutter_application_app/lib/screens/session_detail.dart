@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import '../models/app_user.dart';
 import '../models/session_model.dart';
+import '../models/session_template.dart';
 import '../services/session_service.dart';
+import '../services/template_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../utils/errors.dart';
 import '../utils/format.dart';
 import '../widgets/cartes.dart';
+import '../widgets/current_user_scope.dart';
 import '../widgets/feedback.dart';
 import '../widgets/ressenti_sheet.dart';
 import '../widgets/tags.dart';
@@ -51,6 +54,77 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => CoachCreateSessionScreen(students: [widget.student!], initial: s),
     ));
+  }
+
+  /// « Enregistrer comme modèle » : copie le contenu de la séance dans la
+  /// bibliothèque de modèles du coach, sous un nom choisi.
+  Future<void> _saveAsTemplate() async {
+    final s = _latest;
+    if (s == null) return;
+    final name = await _askTemplateName(s.title);
+    if (name == null || !mounted) return;
+    final coach = CurrentUserScope.of(context);
+    final template = SessionTemplate.fromSession(s);
+    try {
+      await TemplateService().createTemplate(
+        coach.uid,
+        SessionTemplate(
+          id: '',
+          title: name,
+          durationMin: template.durationMin,
+          coachNote: template.coachNote,
+          exercises: template.exercises,
+        ),
+      );
+      if (mounted) showToast(context, 'Modèle « $name » enregistré');
+    } catch (e) {
+      if (mounted) showToast(context, friendlyErrorMessage(e), type: ToastType.error);
+    }
+  }
+
+  Future<String?> _askTemplateName(String initial) {
+    // Pas de dispose() manuel : le dialogue l'utilise encore pendant son
+    // animation de fermeture ; il est libéré avec le dialogue.
+    final controller = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppText.upper('Nouveau modèle')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Le contenu de la séance (exercices, durée, consigne) sera réutilisable pour tous tes élèves.',
+              style: AppText.caption,
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(labelText: 'Nom du modèle'),
+              onSubmitted: (v) {
+                if (v.trim().isNotEmpty) Navigator.pop(ctx, v.trim());
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler', style: TextStyle(color: AppColors.muted)),
+          ),
+          TextButton(
+            onPressed: () {
+              final v = controller.text.trim();
+              if (v.isNotEmpty) Navigator.pop(ctx, v);
+            },
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _delete() async {
@@ -109,11 +183,23 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
             PopupMenuButton<String>(
               color: AppColors.panel,
               icon: const Icon(Icons.more_vert),
-              onSelected: (v) => v == 'edit' ? _edit() : _delete(),
+              onSelected: (v) => switch (v) {
+                'edit' => _edit(),
+                'template' => _saveAsTemplate(),
+                _ => _delete(),
+              },
               itemBuilder: (_) => const [
                 PopupMenuItem(
                   value: 'edit',
                   child: Row(children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 10), Text('Modifier')]),
+                ),
+                PopupMenuItem(
+                  value: 'template',
+                  child: Row(children: [
+                    Icon(Icons.bookmark_add_outlined, size: 18),
+                    SizedBox(width: 10),
+                    Text('Enregistrer comme modèle'),
+                  ]),
                 ),
                 PopupMenuItem(
                   value: 'delete',
