@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService {
   final _auth = FirebaseAuth.instance;
@@ -13,9 +14,11 @@ class AuthService {
       await _auth.signInWithEmailAndPassword(email: email.trim(), password: password);
       return null;
     } on FirebaseAuthException catch (e) {
+      debugPrint('[AuthService.signIn] FirebaseAuthException code=${e.code} message=${e.message}');
       return _signInMessage(e.code);
-    } catch (_) {
-      return 'Erreur de connexion, réessaie';
+    } catch (e, st) {
+      debugPrint('[AuthService.signIn] Erreur inattendue: $e\n$st');
+      return 'Erreur de connexion, réessaie ($e)';
     }
   }
 
@@ -47,6 +50,10 @@ class AuthService {
     'user-disabled' => 'Ce compte a été désactivé',
     'too-many-requests' => 'Trop de tentatives, réessaie plus tard',
     'network-request-failed' => 'Pas de connexion réseau',
-    _ => 'Erreur de connexion, réessaie',
+    'operation-not-allowed' => 'Connexion email/mot de passe désactivée dans Firebase',
+    // macOS / iOS : Firebase Auth n'arrive pas à écrire la session dans le trousseau.
+    'keychain-error' => 'Accès au trousseau refusé (macOS) : active « Keychain Sharing » dans Xcode',
+    // Code inconnu : on l'affiche pour pouvoir diagnostiquer.
+    _ => 'Erreur de connexion, réessaie ($code)',
   };
 }

@@ -27,6 +27,18 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
+  Widget build(BuildContext context) => const AuthGate();
+}
+
+/// MaterialApp de l'application. Il est construit SOUS le profil connecté
+/// (`CurrentUserScope`) pour que toutes les routes poussées et tous les
+/// dialogues y aient accès. La [key] change à chaque connexion / déconnexion,
+/// ce qui repart d'une pile de navigation vide.
+class _App extends StatelessWidget {
+  final Widget home;
+  const _App({super.key, required this.home});
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'FRTN Coaching',
@@ -39,7 +51,7 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: buildAppTheme(),
-      home: const AuthGate(),
+      home: home,
     );
   }
 }
@@ -61,17 +73,22 @@ class _AuthGateState extends State<AuthGate> {
       stream: _auth,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _FullScreenMessage(
-            message: friendlyErrorMessage(snapshot.error!),
-            action: GhostButton(
-              label: 'Réessayer',
-              onPressed: () => setState(() => _auth = AuthService().authStateChanges),
+          return _App(
+            key: const ValueKey('auth-error'),
+            home: _FullScreenMessage(
+              message: friendlyErrorMessage(snapshot.error!),
+              action: GhostButton(
+                label: 'Réessayer',
+                onPressed: () => setState(() => _auth = AuthService().authStateChanges),
+              ),
             ),
           );
         }
-        if (snapshot.connectionState == ConnectionState.waiting) return const _Splash();
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _App(key: ValueKey('splash'), home: _Splash());
+        }
         final user = snapshot.data;
-        if (user == null) return const LoginScreen();
+        if (user == null) return const _App(key: ValueKey('login'), home: LoginScreen());
         return RoleGate(key: ValueKey(user.uid), user: user);
       },
     );
@@ -97,21 +114,31 @@ class _RoleGateState extends State<RoleGate> {
       stream: _profile,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _FullScreenMessage(
-            message: friendlyErrorMessage(snapshot.error!),
-            action: GhostButton(label: 'Se déconnecter', onPressed: () => AuthService().signOut()),
+          return _App(
+            key: const ValueKey('profile-error'),
+            home: _FullScreenMessage(
+              message: friendlyErrorMessage(snapshot.error!),
+              action: GhostButton(label: 'Se déconnecter', onPressed: () => AuthService().signOut()),
+            ),
           );
         }
-        if (snapshot.connectionState == ConnectionState.waiting) return const _Splash();
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _App(key: ValueKey('splash'), home: _Splash());
+        }
         final profile = snapshot.data ??
             AppUser.fallback(
               uid: widget.user.uid,
               email: widget.user.email,
               displayName: widget.user.displayName,
             );
+        // La clé inclut le rôle : passer élève ↔ coach repart d'une navigation vide,
+        // mais une simple mise à jour du profil (nom, poids…) garde la pile ouverte.
         return CurrentUserScope(
           user: profile,
-          child: profile.isCoach ? const CoachShell() : const HomeScreen(),
+          child: _App(
+            key: ValueKey('${profile.uid}-${profile.role.key}'),
+            home: profile.isCoach ? const CoachShell() : const HomeScreen(),
+          ),
         );
       },
     );

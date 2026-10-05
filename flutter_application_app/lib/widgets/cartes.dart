@@ -180,14 +180,23 @@ class ExerciseRow extends StatelessWidget {
   final String name;
   final String detail;
   final Widget? trailing;
+  final VoidCallback? onTap;
 
-  const ExerciseRow({super.key, required this.index, required this.name, required this.detail, this.trailing});
+  const ExerciseRow({
+    super.key,
+    required this.index,
+    required this.name,
+    required this.detail,
+    this.trailing,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
+        onTap: onTap,
         decoration: BoxDecoration(color: AppColors.panel, borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(

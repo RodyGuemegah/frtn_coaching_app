@@ -163,7 +163,14 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
 
   void _open(SessionModel s) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => SessionDetailScreen(uid: widget.student.uid, session: s, readOnly: true)),
+      MaterialPageRoute(
+        builder: (_) => SessionDetailScreen(
+          uid: widget.student.uid,
+          session: s,
+          readOnly: true,
+          student: widget.student, // active Modifier / Supprimer
+        ),
+      ),
     );
   }
 

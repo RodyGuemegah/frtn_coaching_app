@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../models/app_user.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
+import '../../utils/validators.dart';
 import '../../widgets/cartes.dart';
 import '../../widgets/current_user_scope.dart';
 
@@ -53,7 +55,7 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
         email: _email.text,
         age: int.tryParse(_age.text.trim()),
         heightCm: int.tryParse(_height.text.trim()),
-        weightKg: num.tryParse(_weight.text.trim().replaceAll(',', '.')),
+        weightKg: parseUserNumber(_weight.text),
         goal: goal == null || goal.isEmpty ? null : goal,
       );
       if (!mounted) return;
@@ -118,11 +120,29 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
             const SectionLabel('Informations (optionnel)'),
             Row(
               children: [
-                Expanded(child: _field('Âge', _age, keyboard: TextInputType.number, validator: _optionalInt)),
+                Expanded(
+                  child: _field('Âge', _age,
+                      keyboard: TextInputType.number,
+                      validator: ageValidator,
+                      formatters: intInput(),
+                      hint: '${ProfileLimits.minAge}–${ProfileLimits.maxAge}'),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _field('Taille (cm)', _height, keyboard: TextInputType.number, validator: _optionalInt)),
+                Expanded(
+                  child: _field('Taille (cm)', _height,
+                      keyboard: TextInputType.number,
+                      validator: heightValidator,
+                      formatters: intInput(),
+                      hint: '${ProfileLimits.minHeightCm}–${ProfileLimits.maxHeightCm}'),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _field('Poids (kg)', _weight, keyboard: const TextInputType.numberWithOptions(decimal: true), validator: _optionalNum)),
+                Expanded(
+                  child: _field('Poids (kg)', _weight,
+                      keyboard: const TextInputType.numberWithOptions(decimal: true),
+                      validator: weightValidator,
+                      formatters: decimalInput(),
+                      hint: '${ProfileLimits.minWeightKg}–${ProfileLimits.maxWeightKg}'),
+                ),
               ],
             ),
             const _FieldLabel('Objectif du programme'),
@@ -165,6 +185,8 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
     TextInputType? keyboard,
     String? Function(String?)? validator,
     TextCapitalization capitalization = TextCapitalization.none,
+    List<TextInputFormatter>? formatters,
+    String? hint,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,7 +197,11 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
           keyboardType: keyboard,
           textCapitalization: capitalization,
           validator: validator,
+          inputFormatters: formatters,
+          // Retour immédiat dès que la valeur sort des bornes.
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           style: const TextStyle(color: AppColors.text),
+          decoration: InputDecoration(hintText: hint, errorMaxLines: 2),
         ),
       ],
     );
@@ -188,18 +214,6 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
     if (s.isEmpty) return 'Requis';
     final ok = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(s);
     return ok ? null : 'Email invalide';
-  }
-
-  static String? _optionalInt(String? v) {
-    final s = v?.trim() ?? '';
-    if (s.isEmpty) return null;
-    return int.tryParse(s) == null ? 'Nombre entier' : null;
-  }
-
-  static String? _optionalNum(String? v) {
-    final s = v?.trim().replaceAll(',', '.') ?? '';
-    if (s.isEmpty) return null;
-    return num.tryParse(s) == null ? 'Nombre' : null;
   }
 }
 

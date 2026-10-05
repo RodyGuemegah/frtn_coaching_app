@@ -9,12 +9,14 @@ import '../../widgets/cartes.dart';
 import '../../widgets/current_user_scope.dart';
 import 'coach_add_student.dart';
 
-/// Version « page » (route poussée, avec AppBar) du formulaire de création.
+/// Version « page » (route poussée, avec AppBar) du formulaire.
+/// Avec [initial], le formulaire passe en mode édition de cette séance.
 class CoachCreateSessionScreen extends StatelessWidget {
   final List<AppUser> students;
   final String? preselectedStudentId;
+  final SessionModel? initial;
 
-  const CoachCreateSessionScreen({super.key, required this.students, this.preselectedStudentId});
+  const CoachCreateSessionScreen({super.key, required this.students, this.preselectedStudentId, this.initial});
 
   @override
   Widget build(BuildContext context) {
@@ -23,12 +25,14 @@ class CoachCreateSessionScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.accent,
-        title: const Text('Nouvelle séance', style: TextStyle(color: AppColors.text)),
+        title: Text(initial == null ? 'Nouvelle séance' : 'Modifier la séance',
+            style: const TextStyle(color: AppColors.text)),
       ),
       body: SafeArea(
         child: CoachCreateSessionForm(
           students: students,
-          preselectedStudentId: preselectedStudentId,
+          preselectedStudentId: initial?.studentId ?? preselectedStudentId,
+          initial: initial,
           showTitle: false,
           onSubmitted: () => Navigator.of(context).pop(),
         ),
@@ -37,10 +41,13 @@ class CoachCreateSessionScreen extends StatelessWidget {
   }
 }
 
-/// Formulaire de création d'une séance (utilisé en onglet et en page).
+/// Formulaire de création / modification d'une séance (utilisé en onglet et en page).
 class CoachCreateSessionForm extends StatefulWidget {
   final List<AppUser> students;
   final String? preselectedStudentId;
+
+  /// Séance à modifier ; `null` = création.
+  final SessionModel? initial;
   final bool showTitle;
   final VoidCallback? onSubmitted;
 
@@ -48,6 +55,7 @@ class CoachCreateSessionForm extends StatefulWidget {
     super.key,
     required this.students,
     this.preselectedStudentId,
+    this.initial,
     this.showTitle = true,
     this.onSubmitted,
   });
@@ -66,10 +74,21 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
   bool _saving = false;
   String? _error;
 
+  bool get _editing => widget.initial != null;
+
   @override
   void initState() {
     super.initState();
     _studentId = widget.preselectedStudentId;
+    final s = widget.initial;
+    if (s != null) {
+      _studentId = s.studentId;
+      _title.text = s.title;
+      _duration.text = s.durationMin?.toString() ?? '';
+      _note.text = s.coachNote ?? '';
+      _when = s.date;
+      _exercises.addAll(s.exercises);
+    }
   }
 
   @override
@@ -83,10 +102,12 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final base = _when ?? now;
+    // Bornes élargies si la séance modifiée est déjà ancienne.
+    final first = DateTime(now.year - 1);
     final date = await showDatePicker(
       context: context,
       initialDate: base,
-      firstDate: DateTime(now.year - 1),
+      firstDate: base.isBefore(first) ? DateTime(base.year) : first,
       lastDate: DateTime(now.year + 2),
     );
     if (date == null) return;
@@ -106,6 +127,14 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
   Future<void> _addExercise() async {
     final ex = await showDialog<Exercise>(context: context, builder: (_) => const _ExerciseDialog());
     if (ex != null) setState(() => _exercises.add(ex));
+  }
+
+  Future<void> _editExercise(int index) async {
+    final ex = await showDialog<Exercise>(
+      context: context,
+      builder: (_) => _ExerciseDialog(initial: _exercises[index]),
+    );
+    if (ex != null) setState(() => _exercises[index] = ex);
   }
 
   Future<void> _submit() async {
@@ -132,16 +161,17 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
 
     final student = widget.students.where((s) => s.uid == studentId).toList();
     final studentName = student.isEmpty ? 'l\'élève' : student.first.nameOrEmail;
+    final initial = widget.initial;
     final session = SessionModel(
-      id: '',
+      id: initial?.id ?? '',
       title: title,
-      status: 'todo',
+      status: initial?.status ?? 'todo',
       date: when!,
       coachNote: _note.text.trim().isEmpty ? null : _note.text.trim(),
       exercises: List.unmodifiable(_exercises),
       studentId: studentId!,
-      coachId: me.uid,
-      coachName: me.nameOrEmail,
+      coachId: initial?.coachId ?? me.uid,
+      coachName: initial?.coachName ?? me.nameOrEmail,
       durationMin: int.tryParse(_duration.text.trim()),
     );
 
@@ -150,10 +180,16 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
       _error = null;
     });
     try {
-      await SessionService().createSession(studentUid: studentId, session: session);
+      final messenger = ScaffoldMessenger.of(context);
+      if (_editing) {
+        await SessionService().updateSession(studentId, session);
+        messenger.showSnackBar(SnackBar(content: Text('Séance « $title » modifiée')));
+      } else {
+        await SessionService().createSession(studentUid: studentId, session: session);
+        messenger.showSnackBar(SnackBar(content: Text('Séance « $title » assignée à $studentName')));
+        _reset();
+      }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Séance « $title » assignée à $studentName')));
-      _reset();
       widget.onSubmitted?.call();
     } catch (e) {
       if (mounted) setState(() => _error = friendlyErrorMessage(e));
@@ -187,6 +223,12 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
           const SizedBox(height: 2),
           const Text('Assigne une séance à un élève', style: TextStyle(color: AppColors.muted, fontSize: 12)),
         ],
+        if (_editing && widget.initial!.isDone) ...[
+          const SizedBox(height: 8),
+          const ErrorCard(
+            message: "Cette séance est déjà faite. Tes modifications n'effaceront pas le ressenti de l'élève.",
+          ),
+        ],
         const _FieldLabel('Élève'),
         if (widget.students.isEmpty)
           AppCard(
@@ -211,7 +253,8 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
             style: const TextStyle(color: AppColors.text),
             hint: const Text('Choisir un élève'),
             items: widget.students.map((s) => DropdownMenuItem(value: s.uid, child: Text(s.nameOrEmail))).toList(),
-            onChanged: (v) => setState(() => _studentId = v),
+            // En édition, l'élève est verrouillé (la séance vit dans SA collection).
+            onChanged: _editing ? null : (v) => setState(() => _studentId = v),
           ),
         const _FieldLabel('Nom de la séance'),
         TextField(
@@ -264,6 +307,7 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
             index: i + 1,
             name: _exercises[i].name,
             detail: _exercises[i].label,
+            onTap: () => _editExercise(i),
             trailing: IconButton(
               icon: const Icon(Icons.close, size: 18, color: AppColors.muted),
               onPressed: () => setState(() => _exercises.removeAt(i)),
@@ -296,7 +340,11 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
                 ),
         ),
         const SizedBox(height: 22),
-        PrimaryButton(label: '📤 Assigner la séance', loading: _saving, onPressed: _submit),
+        PrimaryButton(
+          label: _editing ? '✓ Enregistrer les modifications' : '📤 Assigner la séance',
+          loading: _saving,
+          onPressed: _submit,
+        ),
       ],
     );
   }
@@ -343,7 +391,9 @@ class _FieldLabel extends StatelessWidget {
 
 /// Saisie d'un exercice (nom, séries, reps, charge, repos).
 class _ExerciseDialog extends StatefulWidget {
-  const _ExerciseDialog();
+  /// Exercice à modifier ; `null` = nouvel exercice.
+  final Exercise? initial;
+  const _ExerciseDialog({this.initial});
 
   @override
   State<_ExerciseDialog> createState() => _ExerciseDialogState();
@@ -351,11 +401,13 @@ class _ExerciseDialog extends StatefulWidget {
 
 class _ExerciseDialogState extends State<_ExerciseDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _name = TextEditingController();
-  final _sets = TextEditingController(text: '3');
-  final _reps = TextEditingController(text: '10');
-  final _load = TextEditingController();
-  final _rest = TextEditingController(text: '90');
+  late final _name = TextEditingController(text: widget.initial?.name ?? '');
+  late final _sets = TextEditingController(text: '${widget.initial?.sets ?? 3}');
+  late final _reps = TextEditingController(text: '${widget.initial?.reps ?? 10}');
+  late final _load = TextEditingController(
+    text: (widget.initial?.load ?? 0) > 0 ? widget.initial!.load.toString() : '',
+  );
+  late final _rest = TextEditingController(text: '${widget.initial?.restSec ?? 90}');
 
   @override
   void dispose() {
@@ -380,7 +432,7 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.panel,
-      title: const Text('Nouvel exercice', style: TextStyle(color: AppColors.text)),
+      title: Text(widget.initial == null ? 'Nouvel exercice' : "Modifier l'exercice", style: const TextStyle(color: AppColors.text)),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -422,7 +474,7 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Annuler')),
-        TextButton(onPressed: _save, child: const Text('Ajouter')),
+        TextButton(onPressed: _save, child: Text(widget.initial == null ? 'Ajouter' : 'Enregistrer')),
       ],
     );
   }

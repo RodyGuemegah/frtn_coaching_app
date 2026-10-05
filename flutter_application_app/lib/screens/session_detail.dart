@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/app_user.dart';
 import '../models/session_model.dart';
 import '../services/session_service.dart';
 import '../theme/app_colors.dart';
@@ -7,15 +8,27 @@ import '../utils/format.dart';
 import '../widgets/cartes.dart';
 import '../widgets/ressenti_sheet.dart';
 import '../widgets/tags.dart';
+import 'coach/coach_create_session.dart';
 
 /// Détail d'une séance. Côté élève : permet de la marquer comme faite avec un
-/// ressenti. Côté coach (`readOnly`) : consultation uniquement.
+/// ressenti. Côté coach (`readOnly`) : consultation, et — si [student] est
+/// fourni — modification / suppression via le menu ⋮.
 class SessionDetailScreen extends StatefulWidget {
   final String uid;
   final SessionModel session;
   final bool readOnly;
 
-  const SessionDetailScreen({super.key, required this.uid, required this.session, this.readOnly = false});
+  /// Élève propriétaire de la séance, fourni uniquement côté coach :
+  /// active les actions Modifier / Supprimer.
+  final AppUser? student;
+
+  const SessionDetailScreen({
+    super.key,
+    required this.uid,
+    required this.session,
+    this.readOnly = false,
+    this.student,
+  });
 
   @override
   State<SessionDetailScreen> createState() => _SessionDetailScreenState();
@@ -24,6 +37,54 @@ class SessionDetailScreen extends StatefulWidget {
 class _SessionDetailScreenState extends State<SessionDetailScreen> {
   late final Stream<SessionModel?> _stream = SessionService().watchSession(widget.uid, widget.session.id);
   bool _saving = false;
+
+  /// Dernière version reçue de Firestore (pour éditer la séance à jour).
+  late SessionModel? _latest = widget.session;
+
+  bool get _canManage => widget.student != null;
+
+  void _edit() {
+    final s = _latest;
+    if (s == null) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => CoachCreateSessionScreen(students: [widget.student!], initial: s),
+    ));
+  }
+
+  Future<void> _delete() async {
+    final s = _latest;
+    if (s == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.panel,
+        title: const Text('Supprimer cette séance ?', style: TextStyle(color: AppColors.text)),
+        content: Text(
+          s.isDone
+              ? '« ${s.title} » est déjà faite. Son ressenti sera perdu et elle disparaîtra de l\'historique de ${widget.student!.shortName}.'
+              : '« ${s.title} » (${sessionDateTag(s.date)}) disparaîtra du programme de ${widget.student!.shortName}.',
+          style: const TextStyle(color: AppColors.muted, height: 1.4),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Supprimer', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await SessionService().deleteSession(widget.uid, s.id);
+      messenger.showSnackBar(SnackBar(content: Text('Séance « ${s.title} » supprimée')));
+      navigator.pop();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(friendlyErrorMessage(e))));
+    }
+  }
 
   Future<void> _markDone(SessionModel session) async {
     final feedback = await showRessentiSheet(context);
@@ -49,12 +110,37 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.accent,
         title: const Text('Séance', style: TextStyle(color: AppColors.text)),
+        actions: [
+          if (_canManage)
+            PopupMenuButton<String>(
+              color: AppColors.panel,
+              icon: const Icon(Icons.more_vert),
+              onSelected: (v) => v == 'edit' ? _edit() : _delete(),
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Row(children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 10), Text('Modifier')]),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(children: [
+                    Icon(Icons.delete_outline, size: 18, color: AppColors.accent),
+                    SizedBox(width: 10),
+                    Text('Supprimer', style: TextStyle(color: AppColors.accent)),
+                  ]),
+                ),
+              ],
+            ),
+        ],
       ),
       body: StreamBuilder<SessionModel?>(
         stream: _stream,
         initialData: widget.session,
         builder: (context, snapshot) {
-          final session = snapshot.data;
+          // En cas d'erreur réseau / droits, StreamBuilder perd la donnée :
+          // on conserve la dernière version connue au lieu d'afficher « supprimée ».
+          if (!snapshot.hasError) _latest = snapshot.data;
+          final session = _latest;
           return ListView(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
             children: [

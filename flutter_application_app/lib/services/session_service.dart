@@ -52,5 +52,19 @@ class SessionService {
     'validatedAt': FieldValue.serverTimestamp(),
   });
 
+  /// Le coach modifie le CONTENU d'une séance (titre, date, durée, consigne, exercices).
+  /// Le statut, le ressenti de l'élève et la validation ne sont jamais touchés.
+  Future<void> updateSession(String studentUid, SessionModel session) {
+    final note = session.coachNote?.trim();
+    return _col(studentUid).doc(session.id).update({
+      'title': session.title,
+      'date': Timestamp.fromDate(session.date),
+      'exercises': session.exercises.map((e) => e.toMap()).toList(),
+      'coachNote': (note == null || note.isEmpty) ? FieldValue.delete() : note,
+      'durationMin': session.durationMin ?? FieldValue.delete(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Future<void> deleteSession(String uid, String id) => _col(uid).doc(id).delete();
 }
