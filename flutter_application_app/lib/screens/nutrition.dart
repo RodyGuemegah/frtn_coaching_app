@@ -4,7 +4,9 @@ import '../services/meal_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/errors.dart';
 import '../widgets/cartes.dart';
+import '../widgets/feedback.dart';
 import '../widgets/meal_widgets.dart';
+import '../theme/app_text.dart';
 
 class NutritionScreen extends StatefulWidget {
   final String uid;
@@ -22,7 +24,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
       await MealService().toggleEaten(widget.uid, m.id, !m.eaten);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(e))));
+      showToast(context, friendlyErrorMessage(e), type: ToastType.error);
     }
   }
 
@@ -39,12 +41,9 @@ class _NutritionScreenState extends State<NutritionScreen> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
           children: [
-            const Text('Programme alimentaire',
-                style: TextStyle(color: AppColors.text, fontSize: 21, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
-            Text(
-              meals.isEmpty ? 'Tes repas du jour apparaîtront ici' : 'Objectif : $totalKcal kcal · $totalProt g protéines',
-              style: const TextStyle(color: AppColors.muted, fontSize: 12),
+            ScreenTitle(
+              'Programme alimentaire',
+              subtitle: meals.isEmpty ? 'Tes repas du jour apparaîtront ici' : 'Objectif : $totalKcal kcal · $totalProt g protéines',
             ),
             const SizedBox(height: 16),
             if (snapshot.hasError)
@@ -87,8 +86,7 @@ class _SummaryCard extends StatelessWidget {
               children: [
                 const Text("Aujourd'hui", style: TextStyle(color: AppColors.muted, fontSize: 12)),
                 const SizedBox(height: 2),
-                Text('$eatenKcal / $totalKcal kcal',
-                    style: const TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w700)),
+                Text('$eatenKcal / $totalKcal kcal', style: AppText.number.copyWith(color: AppColors.text)),
               ],
             ),
           ),

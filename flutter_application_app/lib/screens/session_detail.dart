@@ -3,9 +3,11 @@ import '../models/app_user.dart';
 import '../models/session_model.dart';
 import '../services/session_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text.dart';
 import '../utils/errors.dart';
 import '../utils/format.dart';
 import '../widgets/cartes.dart';
+import '../widgets/feedback.dart';
 import '../widgets/ressenti_sheet.dart';
 import '../widgets/tags.dart';
 import 'coach/coach_create_session.dart';
@@ -54,35 +56,22 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   Future<void> _delete() async {
     final s = _latest;
     if (s == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.panel,
-        title: const Text('Supprimer cette séance ?', style: TextStyle(color: AppColors.text)),
-        content: Text(
-          s.isDone
-              ? '« ${s.title} » est déjà faite. Son ressenti sera perdu et elle disparaîtra de l\'historique de ${widget.student!.shortName}.'
-              : '« ${s.title} » (${sessionDateTag(s.date)}) disparaîtra du programme de ${widget.student!.shortName}.',
-          style: const TextStyle(color: AppColors.muted, height: 1.4),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Supprimer', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
+    final ok = await showConfirmDialog(
+      context,
+      title: 'Supprimer la séance ?',
+      message: s.isDone
+          ? '« ${s.title} » est déjà faite. Son ressenti sera perdu et elle disparaîtra de l\'historique de ${widget.student!.shortName}.'
+          : '« ${s.title} » (${sessionDateTag(s.date)}) disparaîtra du programme de ${widget.student!.shortName}.',
+      confirmLabel: 'Supprimer',
     );
-    if (ok != true || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
+    if (!ok || !mounted) return;
     try {
       await SessionService().deleteSession(widget.uid, s.id);
-      messenger.showSnackBar(SnackBar(content: Text('Séance « ${s.title} » supprimée')));
-      navigator.pop();
+      if (!mounted) return;
+      showToast(context, 'Séance « ${s.title} » supprimée');
+      Navigator.of(context).pop();
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(friendlyErrorMessage(e))));
+      if (mounted) showToast(context, friendlyErrorMessage(e), type: ToastType.error);
     }
   }
 
@@ -93,10 +82,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     try {
       await SessionService().markDone(widget.uid, session.id, feedback);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Séance enregistrée, bravo 💪')));
+      await showSuccessSheet(
+        context,
+        title: 'Séance terminée',
+        message: 'Bravo ! Ton ressenti « ${feedback.ressenti.label} » a été envoyé à ton coach.',
+        emoji: '💪',
+        buttonLabel: 'Bien joué',
+      );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(e))));
+      if (mounted) showToast(context, friendlyErrorMessage(e), type: ToastType.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -109,7 +103,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.accent,
-        title: const Text('Séance', style: TextStyle(color: AppColors.text)),
+        title: Text(AppText.upper('Séance')),
         actions: [
           if (_canManage)
             PopupMenuButton<String>(
@@ -168,7 +162,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         child: TagChip(sessionDateTag(s.date), style: s.isDone ? TagStyle.neutral : TagStyle.today),
       ),
       const SizedBox(height: 8),
-      Text(s.title, style: const TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w800)),
+      Text(AppText.upper(s.title), style: AppText.heroTitle.copyWith(fontSize: 26)),
       const SizedBox(height: 4),
       Text('Assignée par $coach$duration', style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
       if (s.coachNote != null) ...[
@@ -205,8 +199,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
         const SizedBox(height: 10),
         GhostButton(
           label: '💬 Envoyer un message au coach',
-          onPressed: () => ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('Messagerie bientôt disponible'))),
+          onPressed: () => showToast(context, 'Messagerie bientôt disponible', type: ToastType.info),
         ),
       ],
     ];

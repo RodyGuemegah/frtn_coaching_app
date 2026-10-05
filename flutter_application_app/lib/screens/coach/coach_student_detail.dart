@@ -3,10 +3,12 @@ import '../../models/app_user.dart';
 import '../../models/session_model.dart';
 import '../../services/session_service.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_text.dart';
 import '../../utils/coach_stats.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
 import '../../widgets/cartes.dart';
+import '../../widgets/feedback.dart';
 import '../../widgets/tags.dart';
 import '../session_detail.dart';
 import '../sessions_screen.dart';
@@ -32,16 +34,16 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
     try {
       await SessionService().validateFeedback(widget.student.uid, session.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Retour validé ✓')));
+      showToast(context, 'Retour validé — ${widget.student.shortName} le verra dans son historique');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(e))));
+      showToast(context, friendlyErrorMessage(e), type: ToastType.error);
     } finally {
       if (mounted) setState(() => _validating = false);
     }
   }
 
-  void _snack(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _snack(String text) => showToast(context, text, type: ToastType.info);
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +59,7 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.accent,
-        title: Text(student.nameOrEmail, style: const TextStyle(color: AppColors.text)),
+        title: Text(AppText.upper(student.nameOrEmail)),
       ),
       body: StreamBuilder<List<SessionModel>>(
         stream: _sessions,
@@ -79,7 +81,7 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(student.nameOrEmail, style: const TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w700)),
+                        Text(AppText.upper(student.nameOrEmail), style: AppText.heroTitle),
                         const SizedBox(height: 2),
                         Text(
                           [if (student.goal != null) student.goal!, if (details.isNotEmpty) details.join(' · ')].join(' · '),

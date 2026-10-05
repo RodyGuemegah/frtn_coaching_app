@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/session_model.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text.dart';
 import 'cartes.dart';
 
 /// Bottom sheet « Comment s'est passée la séance ? » — retourne le ressenti
@@ -40,10 +41,7 @@ class _RessentiSheetState extends State<_RessentiSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            "Comment s'est passée la séance ?",
-            style: TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w800),
-          ),
+          Text(AppText.upper("Comment s'est passée la séance ?"), style: AppText.barTitle),
           const SizedBox(height: 16),
           Row(
             children: [

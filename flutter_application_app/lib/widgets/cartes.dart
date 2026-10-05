@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text.dart';
 
 /// Carte de base au style de la maquette (fond + bordure arrondie).
 class AppCard extends StatelessWidget {
@@ -53,17 +54,11 @@ class StatTile extends StatelessWidget {
     return AppCard(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            value,
-            style: const TextStyle(color: AppColors.accent, fontSize: 20, fontWeight: FontWeight.w800),
-          ),
+          Text(value, style: AppText.number),
           const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.muted, fontSize: 11),
-          ),
+          Text(label, textAlign: TextAlign.center, style: AppText.caption.copyWith(fontSize: 11)),
         ],
       ),
     );
@@ -78,15 +73,34 @@ class SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 10),
-      child: Text(
-        text.toUpperCase(),
-        style: const TextStyle(
-          color: AppColors.muted,
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-        ),
+      padding: const EdgeInsets.only(top: 22, bottom: 10),
+      child: Text(AppText.upper(text), style: AppText.section),
+    );
+  }
+}
+
+/// Encadré d'information / avertissement (non bloquant), distinct d'une erreur.
+class NoticeCard extends StatelessWidget {
+  final String message;
+  final IconData icon;
+  const NoticeCard(this.message, {super.key, this.icon = Icons.info_outline_rounded});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.panel,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColors.muted, size: 18),
+          const SizedBox(width: 10),
+          Expanded(child: Text(message, style: AppText.caption.copyWith(fontSize: 12.5, color: AppColors.text))),
+        ],
       ),
     );
   }
@@ -124,16 +138,7 @@ class PrimaryButton extends StatelessWidget {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
                     )
-                  : Text(
-                      label.toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        fontStyle: FontStyle.italic,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
+                  : Text(AppText.upper(label), style: AppText.button),
             ),
           ),
         ),
@@ -286,7 +291,7 @@ class GhostButton extends StatelessWidget {
           side: const BorderSide(color: AppColors.border),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
-        child: Text(label, style: const TextStyle(color: AppColors.text, fontWeight: FontWeight.w600)),
+        child: Text(label, style: AppText.bodyText.copyWith(fontWeight: FontWeight.w600)),
       ),
     );
   }

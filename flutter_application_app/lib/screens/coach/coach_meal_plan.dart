@@ -3,10 +3,12 @@ import '../../models/app_user.dart';
 import '../../models/meal_model.dart';
 import '../../services/meal_service.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_text.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
 import '../../utils/session_stats.dart';
 import '../../widgets/cartes.dart';
+import '../../widgets/feedback.dart';
 import '../../widgets/meal_widgets.dart';
 import '../../widgets/tags.dart';
 import '../../widgets/week_strip.dart';
@@ -44,14 +46,14 @@ class _CoachMealPlanScreenState extends State<CoachMealPlanScreen> {
     });
   }
 
-  void _snack(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _snack(String text, {ToastType type = ToastType.success}) => showToast(context, text, type: type);
 
   Future<void> _run(Future<void> Function() action, String success) async {
     try {
       await action();
       if (mounted) _snack(success);
     } catch (e) {
-      if (mounted) _snack(friendlyErrorMessage(e));
+      if (mounted) _snack(friendlyErrorMessage(e), type: ToastType.error);
     }
   }
 
@@ -68,22 +70,13 @@ class _CoachMealPlanScreenState extends State<CoachMealPlanScreen> {
   }
 
   Future<void> _delete(MealModel m) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.panel,
-        title: const Text('Supprimer ce repas ?', style: TextStyle(color: AppColors.text)),
-        content: Text('${m.title} · ${m.time}', style: const TextStyle(color: AppColors.muted)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Supprimer', style: TextStyle(color: AppColors.accent)),
-          ),
-        ],
-      ),
+    final ok = await showConfirmDialog(
+      context,
+      title: 'Supprimer ce repas ?',
+      message: '${m.title} · ${m.time} disparaîtra du plan de ${widget.student.shortName}.',
+      confirmLabel: 'Supprimer',
     );
-    if (ok != true) return;
+    if (!ok) return;
     await _run(() => _service.deleteMeal(widget.student.uid, m.id), 'Repas supprimé');
   }
 
@@ -97,7 +90,7 @@ class _CoachMealPlanScreenState extends State<CoachMealPlanScreen> {
       final n = await _service.copyMealsToDays(widget.student.uid, meals, choice.days, replace: choice.replace);
       if (mounted) _snack('$n repas copiés sur ${choice.days.length} jour${choice.days.length > 1 ? 's' : ''}');
     } catch (e) {
-      if (mounted) _snack(friendlyErrorMessage(e));
+      if (mounted) _snack(friendlyErrorMessage(e), type: ToastType.error);
     }
   }
 
@@ -108,7 +101,7 @@ class _CoachMealPlanScreenState extends State<CoachMealPlanScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.accent,
-        title: Text('Plan alimentaire · ${widget.student.shortName}', style: const TextStyle(color: AppColors.text)),
+        title: Text(AppText.upper('Plan alimentaire · ${widget.student.shortName}')),
       ),
       body: StreamBuilder<List<MealModel>>(
         stream: _weekStream,
@@ -176,8 +169,7 @@ class _TotalsCard extends StatelessWidget {
                     Text(isSameDay(day, DateTime.now()) ? "Total aujourd'hui" : 'Total du jour',
                         style: const TextStyle(color: AppColors.muted, fontSize: 12)),
                     const SizedBox(height: 2),
-                    Text('${totals.kcal} kcal',
-                        style: const TextStyle(color: AppColors.text, fontSize: 20, fontWeight: FontWeight.w800)),
+                    Text('${totals.kcal} kcal', style: AppText.number.copyWith(color: AppColors.text)),
                   ],
                 ),
               ),
@@ -272,7 +264,7 @@ class _DuplicateDialogState extends State<_DuplicateDialog> {
     final allSelected = _selected.length == _candidates.length;
     return AlertDialog(
       backgroundColor: AppColors.panel,
-      title: const Text('Dupliquer la journée', style: TextStyle(color: AppColors.text)),
+      title: Text(AppText.upper('Dupliquer la journée')),
       content: SizedBox(
         width: 340,
         child: SingleChildScrollView(

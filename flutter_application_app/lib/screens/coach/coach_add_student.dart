@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import '../../models/app_user.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_text.dart';
 import '../../utils/validators.dart';
 import '../../widgets/cartes.dart';
+import '../../widgets/feedback.dart';
 import '../../widgets/current_user_scope.dart';
 
 const _goals = ['Prise de masse', 'Perte de poids', 'Remise en forme', 'Performance', 'Autre'];
@@ -72,22 +74,15 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
 
   Future<void> _showSuccess(StudentCreationResult result) {
     final AppUser s = result.student;
-    return showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.panel,
-        title: const Text('Compte créé ✅', style: TextStyle(color: AppColors.text)),
-        content: Text(
-          result.resetEmailSent
-              ? '${s.nameOrEmail} recevra un email à ${s.email} pour choisir son mot de passe.'
-              : "Le compte de ${s.nameOrEmail} est créé, mais l'email n'a pas pu être envoyé. "
-                  "L'élève pourra utiliser « Mot de passe oublié ? » sur l'écran de connexion avec ${s.email}.",
-          style: const TextStyle(color: AppColors.muted, height: 1.4),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK')),
-        ],
-      ),
+    return showSuccessSheet(
+      context,
+      title: 'Compte créé',
+      message: result.resetEmailSent
+          ? '${s.nameOrEmail} rejoint ton équipe ! Un email vient de partir à ${s.email} pour choisir son mot de passe.'
+          : "Le compte de ${s.nameOrEmail} est créé, mais l'email n'a pas pu être envoyé. "
+              "L'élève pourra utiliser « Mot de passe oublié ? » avec ${s.email}.",
+      emoji: result.resetEmailSent ? '🎉' : '✓',
+      buttonLabel: 'Super',
     );
   }
 
@@ -98,7 +93,7 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.accent,
-        title: const Text('Nouvel élève', style: TextStyle(color: AppColors.text)),
+        title: Text(AppText.upper('Nouvel élève')),
       ),
       body: Form(
         key: _formKey,

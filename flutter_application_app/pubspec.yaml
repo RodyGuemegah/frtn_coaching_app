@@ -62,6 +62,41 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Charte typographique FRTN (licences OFL dans assets/fonts/).
+  # - Barlow Condensed : titres, boutons, chiffres (italique extra-gras, façon maquette)
+  # - Inter : textes courants
+  fonts:
+    - family: BarlowCondensed
+      fonts:
+        - asset: assets/fonts/BarlowCondensed-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/BarlowCondensed-SemiBoldItalic.ttf
+          weight: 600
+          style: italic
+        - asset: assets/fonts/BarlowCondensed-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/BarlowCondensed-BoldItalic.ttf
+          weight: 700
+          style: italic
+        - asset: assets/fonts/BarlowCondensed-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/BarlowCondensed-ExtraBoldItalic.ttf
+          weight: 800
+          style: italic
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

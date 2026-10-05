@@ -6,8 +6,10 @@ import '../../theme/app_colors.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
 import '../../widgets/cartes.dart';
+import '../../widgets/feedback.dart';
 import '../../widgets/current_user_scope.dart';
 import 'coach_add_student.dart';
+import '../../theme/app_text.dart';
 
 /// Version « page » (route poussée, avec AppBar) du formulaire.
 /// Avec [initial], le formulaire passe en mode édition de cette séance.
@@ -25,8 +27,7 @@ class CoachCreateSessionScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.accent,
-        title: Text(initial == null ? 'Nouvelle séance' : 'Modifier la séance',
-            style: const TextStyle(color: AppColors.text)),
+        title: Text(AppText.upper(initial == null ? 'Nouvelle séance' : 'Modifier la séance')),
       ),
       body: SafeArea(
         child: CoachCreateSessionForm(
@@ -180,16 +181,16 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
       _error = null;
     });
     try {
-      final messenger = ScaffoldMessenger.of(context);
       if (_editing) {
         await SessionService().updateSession(studentId, session);
-        messenger.showSnackBar(SnackBar(content: Text('Séance « $title » modifiée')));
+        if (!mounted) return;
+        showToast(context, 'Séance « $title » modifiée');
       } else {
         await SessionService().createSession(studentUid: studentId, session: session);
-        messenger.showSnackBar(SnackBar(content: Text('Séance « $title » assignée à $studentName')));
+        if (!mounted) return;
+        showToast(context, 'Séance « $title » assignée à $studentName');
         _reset();
       }
-      if (!mounted) return;
       widget.onSubmitted?.call();
     } catch (e) {
       if (mounted) setState(() => _error = friendlyErrorMessage(e));
@@ -219,14 +220,13 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
       children: [
         if (widget.showTitle) ...[
-          const Text('Nouvelle séance', style: TextStyle(color: AppColors.text, fontSize: 21, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 2),
-          const Text('Assigne une séance à un élève', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+          const ScreenTitle('Nouvelle séance', subtitle: 'Assigne une séance à un élève'),
         ],
         if (_editing && widget.initial!.isDone) ...[
           const SizedBox(height: 8),
-          const ErrorCard(
-            message: "Cette séance est déjà faite. Tes modifications n'effaceront pas le ressenti de l'élève.",
+          const NoticeCard(
+            "Cette séance est déjà faite. Tes modifications n'effaceront pas le ressenti de l'élève.",
+            icon: Icons.check_circle_outline_rounded,
           ),
         ],
         const _FieldLabel('Élève'),
@@ -432,7 +432,7 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.panel,
-      title: Text(widget.initial == null ? 'Nouvel exercice' : "Modifier l'exercice", style: const TextStyle(color: AppColors.text)),
+      title: Text(AppText.upper(widget.initial == null ? 'Nouvel exercice' : "Modifier l'exercice")),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(

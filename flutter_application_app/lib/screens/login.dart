@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text.dart';
 import '../widgets/cartes.dart';
+import '../widgets/feedback.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -51,9 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _error = error);
     if (error == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Si un compte existe pour cet email, un lien vient d\'être envoyé.')),
-      );
+      showToast(context, 'Si un compte existe pour cet email, un lien vient d\'être envoyé.', type: ToastType.info);
     }
   }
 
@@ -87,15 +87,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 24),
                       _buildLogo(),
                       const SizedBox(height: 18),
-                      const Text(
-                        'FRTN Coaching',
+                      Text.rich(
+                        TextSpan(children: [
+                          const TextSpan(text: 'FRTN '),
+                          TextSpan(text: AppText.upper('Coaching'), style: const TextStyle(color: AppColors.accent)),
+                        ]),
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.2,
-                        ),
+                        style: AppText.screenTitle.copyWith(fontSize: 36),
                       ),
                       const SizedBox(height: 6),
                       Text(

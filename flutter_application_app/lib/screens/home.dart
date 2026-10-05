@@ -16,6 +16,7 @@ import 'planning.dart';
 import 'profil.dart';
 import 'session_detail.dart';
 import 'sessions_screen.dart';
+import '../theme/app_text.dart';
 
 /// Coquille de l'app élève : contenu de l'onglet + barre de navigation basse.
 class HomeScreen extends StatefulWidget {
@@ -88,15 +89,7 @@ class _HomeTabState extends State<_HomeTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Salut ${user.shortName} 👋',
-                          style: const TextStyle(color: AppColors.text, fontSize: 21, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 2),
-                      Text(todayLabel(now), style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-                    ],
-                  ),
+                  child: ScreenTitle('Salut ${user.shortName} 👋', subtitle: todayLabel(now)),
                 ),
                 GestureDetector(onTap: () => widget.onOpenTab(4), child: InitialsAvatar(user.initials)),
               ],
@@ -223,7 +216,7 @@ class _NextSessionCard extends StatelessWidget {
         children: [
           Align(alignment: Alignment.centerLeft, child: TagChip(sessionDateTag(s.date), style: TagStyle.today)),
           const SizedBox(height: 8),
-          Text(s.title, style: const TextStyle(color: AppColors.text, fontSize: 17, fontWeight: FontWeight.w700)),
+          Text(AppText.upper(s.title), style: AppText.heroTitle),
           const SizedBox(height: 2),
           Text(details.join(' · '), style: const TextStyle(color: AppColors.muted, fontSize: 12)),
           const SizedBox(height: 14),

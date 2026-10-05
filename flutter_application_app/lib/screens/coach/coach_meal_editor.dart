@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/meal_model.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_text.dart';
 import '../../utils/format.dart';
 import '../../widgets/cartes.dart';
 
@@ -110,8 +111,7 @@ class _MealEditorState extends State<_MealEditor> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(editing ? 'Modifier le repas' : 'Nouveau repas',
-                  style: const TextStyle(color: AppColors.text, fontSize: 18, fontWeight: FontWeight.w800)),
+              Text(AppText.upper(editing ? 'Modifier le repas' : 'Nouveau repas'), style: AppText.barTitle),
               const SizedBox(height: 2),
               Text(formatDayLong(widget.day), style: const TextStyle(color: AppColors.muted, fontSize: 12)),
               const SizedBox(height: 14),

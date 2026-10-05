@@ -16,6 +16,7 @@ import '../../widgets/tags.dart';
 import 'coach_add_student.dart';
 import 'coach_create_session.dart';
 import 'coach_student_detail.dart';
+import '../../theme/app_text.dart';
 
 /// Données partagées par les onglets de l'espace coach.
 class CoachData {
@@ -160,14 +161,9 @@ class _CoachDashboardTab extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Espace coach', style: TextStyle(color: AppColors.text, fontSize: 21, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 2),
-                  Text('${todayLabel()} · $n élève${n > 1 ? 's' : ''} actif${n > 1 ? 's' : ''}',
-                      style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-                ],
+              child: ScreenTitle(
+                'Espace coach',
+                subtitle: '${todayLabel()} · $n élève${n > 1 ? 's' : ''} actif${n > 1 ? 's' : ''}',
               ),
             ),
             PopupMenuButton<String>(
@@ -242,9 +238,7 @@ class _CoachStudentsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
       children: [
-        const Text('Mes élèves', style: TextStyle(color: AppColors.text, fontSize: 21, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 2),
-        Text(n == 0 ? 'Aucun élève rattaché' : '$n élève${n > 1 ? 's' : ''}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+        ScreenTitle('Mes élèves', subtitle: n == 0 ? 'Aucun élève rattaché' : '$n élève${n > 1 ? 's' : ''}'),
         const SizedBox(height: 16),
         PrimaryButton(
           label: '+ Ajouter un élève',

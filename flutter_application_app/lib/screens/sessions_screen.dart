@@ -7,6 +7,7 @@ import '../utils/format.dart';
 import '../widgets/cartes.dart';
 import '../widgets/tags.dart';
 import 'session_detail.dart';
+import '../theme/app_text.dart';
 
 /// Onglet « Mes séances » (élève) : à venir puis terminées.
 class SessionsScreen extends StatefulWidget {
@@ -32,11 +33,11 @@ class _SessionsScreenState extends State<SessionsScreen> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
           children: [
-            const Text('Mes séances', style: TextStyle(color: AppColors.text, fontSize: 21, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
-            Text(
-              sessions.isEmpty ? 'Ton programme apparaîtra ici' : '${upcoming.length} à venir · ${done.length} terminée${done.length > 1 ? 's' : ''}',
-              style: const TextStyle(color: AppColors.muted, fontSize: 12),
+            ScreenTitle(
+              'Mes séances',
+              subtitle: sessions.isEmpty
+                  ? 'Ton programme apparaîtra ici'
+                  : '${upcoming.length} à venir · ${done.length} terminée${done.length > 1 ? 's' : ''}',
             ),
             const SizedBox(height: 8),
             if (snapshot.hasError)
