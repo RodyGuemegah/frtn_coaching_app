@@ -10,6 +10,8 @@ import 'screens/home.dart';
 import 'screens/login.dart';
 import 'services/auth_service.dart';
 import 'services/user_service.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_text.dart';
 import 'theme/app_theme.dart';
 import 'utils/errors.dart';
 import 'widgets/cartes.dart';
@@ -131,6 +133,13 @@ class _RoleGateState extends State<RoleGate> {
               email: widget.user.email,
               displayName: widget.user.displayName,
             );
+        // Élève retiré par son coach : accès suspendu (son historique est conservé).
+        if (!profile.isCoach && profile.archived) {
+          return _App(
+            key: ValueKey('${profile.uid}-archived'),
+            home: _SuspendedScreen(coachName: profile.coachName),
+          );
+        }
         // La clé inclut le rôle : passer élève ↔ coach repart d'une navigation vide,
         // mais une simple mise à jour du profil (nom, poids…) garde la pile ouverte.
         return CurrentUserScope(
@@ -173,6 +182,51 @@ class _FullScreenMessage extends StatelessWidget {
                 ErrorCard(message: message),
                 const SizedBox(height: 16),
                 action,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Écran affiché à un élève retiré par son coach.
+class _SuspendedScreen extends StatelessWidget {
+  final String? coachName;
+  const _SuspendedScreen({this.coachName});
+
+  @override
+  Widget build(BuildContext context) {
+    final coach = (coachName?.trim().isNotEmpty ?? false) ? coachName!.trim() : 'ton coach';
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.card2),
+                    child: const Icon(Icons.pause_rounded, color: AppColors.muted, size: 40),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(AppText.upper('Accès suspendu'), textAlign: TextAlign.center, style: AppText.screenTitle),
+                const SizedBox(height: 10),
+                Text(
+                  'Ton accompagnement avec $coach est en pause. '
+                  'Contacte-le pour réactiver ton compte : tout ton historique est conservé.',
+                  textAlign: TextAlign.center,
+                  style: AppText.bodyText.copyWith(color: AppColors.muted),
+                ),
+                const SizedBox(height: 28),
+                GhostButton(label: 'Se déconnecter', onPressed: () => AuthService().signOut()),
               ],
             ),
           ),

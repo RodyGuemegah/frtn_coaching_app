@@ -4,6 +4,7 @@ import '../../models/app_user.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text.dart';
+import '../../utils/errors.dart';
 import '../../utils/validators.dart';
 import '../../widgets/cartes.dart';
 import '../../widgets/feedback.dart';
@@ -11,9 +12,12 @@ import '../../widgets/current_user_scope.dart';
 
 const _goals = ['Prise de masse', 'Perte de poids', 'Remise en forme', 'Performance', 'Autre'];
 
-/// Création d'un compte élève par le coach.
+/// Création d'un compte élève par le coach — ou, avec [initial],
+/// modification de la fiche d'un élève existant.
 class CoachAddStudentScreen extends StatefulWidget {
-  const CoachAddStudentScreen({super.key});
+  /// Élève à modifier ; `null` = création d'un nouveau compte.
+  final AppUser? initial;
+  const CoachAddStudentScreen({super.key, this.initial});
 
   @override
   State<CoachAddStudentScreen> createState() => _CoachAddStudentScreenState();
@@ -32,6 +36,36 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
   bool _saving = false;
   String? _error;
 
+  bool get _editing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.initial;
+    if (s == null) return;
+    _firstName.text = s.firstName;
+    _lastName.text = s.lastName;
+    // Anciens profils sans prénom/nom séparés : on découpe le nom affiché.
+    if (s.firstName.isEmpty && s.lastName.isEmpty && s.displayName.trim().isNotEmpty) {
+      final parts = s.displayName.trim().split(RegExp(r'\s+'));
+      _firstName.text = parts.first;
+      _lastName.text = parts.skip(1).join(' ');
+    }
+    _email.text = s.email;
+    _age.text = s.age?.toString() ?? '';
+    _height.text = s.heightCm?.toString() ?? '';
+    _weight.text = s.weightKg == null ? '' : s.weightKg.toString().replaceAll('.', ',');
+    if (s.goal != null) {
+      // Objectif hors liste → « Autre » + champ libre pré-rempli.
+      if (_goals.contains(s.goal) && s.goal != 'Autre') {
+        _goal = s.goal;
+      } else {
+        _goal = 'Autre';
+        _customGoal.text = s.goal!;
+      }
+    }
+  }
+
   @override
   void dispose() {
     for (final c in [_firstName, _lastName, _email, _age, _height, _weight, _customGoal]) {
@@ -43,6 +77,7 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
   Future<void> _submit() async {
     if (_saving) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_editing) return _saveChanges();
     final coach = CurrentUserScope.of(context);
     setState(() {
       _saving = true;
@@ -72,6 +107,34 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
     }
   }
 
+  /// Mode édition : met à jour la fiche (sans toucher à l'email ni au compte).
+  Future<void> _saveChanges() async {
+    final student = widget.initial!;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final goal = _goal == 'Autre' ? _customGoal.text.trim() : _goal;
+      await UserService().updateStudentProfile(
+        student.uid,
+        firstName: _firstName.text,
+        lastName: _lastName.text,
+        age: int.tryParse(_age.text.trim()),
+        heightCm: int.tryParse(_height.text.trim()),
+        weightKg: parseUserNumber(_weight.text),
+        goal: goal,
+      );
+      if (!mounted) return;
+      showToast(context, 'Fiche de ${_firstName.text.trim()} mise à jour');
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) setState(() => _error = friendlyErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _showSuccess(StudentCreationResult result) {
     final AppUser s = result.student;
     return showSuccessSheet(
@@ -93,16 +156,18 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.accent,
-        title: Text(AppText.upper('Nouvel élève')),
+        title: Text(AppText.upper(_editing ? "Modifier l'élève" : 'Nouvel élève')),
       ),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
           children: [
-            const Text(
-              "L'élève recevra un email pour choisir son mot de passe.",
-              style: TextStyle(color: AppColors.muted, fontSize: 12.5),
+            Text(
+              _editing
+                  ? "Les modifications sont visibles tout de suite dans le profil de l'élève."
+                  : "L'élève recevra un email pour choisir son mot de passe.",
+              style: AppText.caption,
             ),
             Row(
               children: [
@@ -111,7 +176,13 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
                 Expanded(child: _field('Nom *', _lastName, validator: _required, capitalization: TextCapitalization.words)),
               ],
             ),
-            _field('Email *', _email, keyboard: TextInputType.emailAddress, validator: _emailValidator),
+            _field(
+              _editing ? 'Email (adresse de connexion, non modifiable ici)' : 'Email *',
+              _email,
+              keyboard: TextInputType.emailAddress,
+              validator: _emailValidator,
+              readOnly: _editing,
+            ),
             const SectionLabel('Informations (optionnel)'),
             Row(
               children: [
@@ -146,7 +217,11 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
               dropdownColor: AppColors.panel,
               style: const TextStyle(color: AppColors.text),
               hint: const Text('Choisir un objectif'),
-              items: _goals.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+              items: [
+                // En édition, on peut retirer l'objectif.
+                if (_editing) const DropdownMenuItem<String>(value: null, child: Text('Aucun objectif')),
+                ..._goals.map((g) => DropdownMenuItem(value: g, child: Text(g))),
+              ],
               onChanged: (v) => setState(() => _goal = v),
             ),
             if (_goal == 'Autre') _field('Précise l\'objectif', _customGoal),
@@ -167,7 +242,7 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
                     ),
             ),
             const SizedBox(height: 22),
-            PrimaryButton(label: 'Créer le compte', loading: _saving, onPressed: _submit),
+            PrimaryButton(label: _editing ? 'Enregistrer' : 'Créer le compte', loading: _saving, onPressed: _submit),
           ],
         ),
       ),
@@ -182,6 +257,7 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
     TextCapitalization capitalization = TextCapitalization.none,
     List<TextInputFormatter>? formatters,
     String? hint,
+    bool readOnly = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,10 +269,16 @@ class _CoachAddStudentScreenState extends State<CoachAddStudentScreen> {
           textCapitalization: capitalization,
           validator: validator,
           inputFormatters: formatters,
+          readOnly: readOnly,
+          enabled: !readOnly,
           // Retour immédiat dès que la valeur sort des bornes.
           autovalidateMode: AutovalidateMode.onUserInteraction,
-          style: const TextStyle(color: AppColors.text),
-          decoration: InputDecoration(hintText: hint, errorMaxLines: 2),
+          style: TextStyle(color: readOnly ? AppColors.muted : AppColors.text),
+          decoration: InputDecoration(
+            hintText: hint,
+            errorMaxLines: 2,
+            suffixIcon: readOnly ? const Icon(Icons.lock_outline_rounded, size: 18, color: AppColors.muted) : null,
+          ),
         ),
       ],
     );

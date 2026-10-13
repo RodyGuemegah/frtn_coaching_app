@@ -23,8 +23,10 @@ service cloud.firestore {
 
       // L'élève modifie ses infos (jamais role / coachId / email) ;
       // le coach modifie ses élèves (jamais role / coachId).
-      allow update: if (me() == uid && !changedKeys().hasAny(['role', 'coachId', 'email']))
-        || (isCoach() && resource.data.coachId == me() && !changedKeys().hasAny(['role', 'coachId']));
+      // - email : adresse de connexion, jamais modifiée via le profil (ni par l'élève, ni par le coach).
+      // - archived : seul le coach peut retirer / réactiver un élève.
+      allow update: if (me() == uid && !changedKeys().hasAny(['role', 'coachId', 'email', 'archived', 'archivedAt']))
+        || (isCoach() && resource.data.coachId == me() && !changedKeys().hasAny(['role', 'coachId', 'email']));
 
       allow delete: if false;
 

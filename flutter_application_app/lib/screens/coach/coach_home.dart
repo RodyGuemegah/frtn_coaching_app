@@ -21,7 +21,10 @@ import '../../theme/app_text.dart';
 /// Données partagées par les onglets de l'espace coach.
 class CoachData {
   final AppUser me;
+
+  /// Élèves actifs (les élèves retirés sont dans [archived]).
   final List<AppUser> students;
+  final List<AppUser> archived;
   final List<SessionModel> sessions;
   final CoachStats stats;
   final bool loading;
@@ -31,6 +34,7 @@ class CoachData {
   const CoachData({
     required this.me,
     required this.students,
+    this.archived = const [],
     required this.sessions,
     required this.stats,
     required this.loading,
@@ -115,11 +119,17 @@ class _CoachShellState extends State<CoachShell> {
   @override
   Widget build(BuildContext context) {
     final me = CurrentUserScope.of(context);
+    // Les élèves retirés (archivés) sortent du dashboard, des stats et de la création de séance.
+    final active = _students.where((s) => !s.archived).toList();
+    final archived = _students.where((s) => s.archived).toList();
+    final activeIds = active.map((s) => s.uid).toSet();
+    final activeSessions = _sessions.where((s) => activeIds.contains(s.studentId)).toList();
     final data = CoachData(
       me: me,
-      students: _students,
-      sessions: _sessions,
-      stats: coachStats(_students, _sessions, DateTime.now()),
+      students: active,
+      archived: archived,
+      sessions: activeSessions,
+      stats: coachStats(active, activeSessions, DateTime.now()),
       loading: !(_studentsLoaded && _sessionsLoaded),
       studentsError: _studentsError,
       sessionsError: _sessionsError,
@@ -127,7 +137,7 @@ class _CoachShellState extends State<CoachShell> {
     final tabs = [
       _CoachDashboardTab(data: data, onOpenTab: _openTab, onRetry: _retry),
       _CoachStudentsTab(data: data, onRetry: _retry),
-      CoachCreateSessionForm(students: _students),
+      CoachCreateSessionForm(students: active),
     ];
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -253,6 +263,76 @@ class _CoachStudentsTab extends StatelessWidget {
           const AppCard(child: Text("Crée un compte élève : il recevra un email pour choisir son mot de passe.", style: TextStyle(color: AppColors.muted)))
         else
           for (final s in data.students) StudentRow(student: s, stats: data.stats.of(s.uid)),
+        if (data.archived.isNotEmpty) _ArchivedSection(students: data.archived),
+      ],
+    );
+  }
+}
+
+/// Section repliable « Anciens élèves » (élèves retirés, réactivables depuis leur fiche).
+class _ArchivedSection extends StatefulWidget {
+  final List<AppUser> students;
+  const _ArchivedSection({required this.students});
+
+  @override
+  State<_ArchivedSection> createState() => _ArchivedSectionState();
+}
+
+class _ArchivedSectionState extends State<_ArchivedSection> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final n = widget.students.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => setState(() => _open = !_open),
+          child: Row(
+            children: [
+              Expanded(child: SectionLabel('Anciens élèves ($n)')),
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Icon(_open ? Icons.expand_less : Icons.expand_more, color: AppColors.muted),
+              ),
+            ],
+          ),
+        ),
+        if (_open)
+          for (final s in widget.students)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Opacity(
+                opacity: 0.6,
+                child: AppCard(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => CoachStudentDetailScreen(student: s)),
+                  ),
+                  child: Row(
+                    children: [
+                      InitialsAvatar(s.initials, style: AvatarStyle.grey),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(s.nameOrEmail, style: AppText.itemTitle),
+                            const SizedBox(height: 2),
+                            Text(
+                              s.archivedAt != null ? 'Retiré le ${formatDate(s.archivedAt!)}' : 'Retiré',
+                              style: AppText.caption,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const TagChip('Archivé', style: TagStyle.neutral),
+                    ],
+                  ),
+                ),
+              ),
+            ),
       ],
     );
   }

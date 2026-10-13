@@ -54,6 +54,39 @@ class UserService {
 
   Future<void> updateProfile(String uid, Map<String, dynamic> patch) => _doc(uid).update(patch);
 
+  /// Retire (archive) ou réactive un élève. Rien n'est supprimé :
+  /// séances, retours et repas restent consultables par le coach.
+  Future<void> setArchived(String uid, bool archived) => _doc(uid).update({
+        'archived': archived,
+        'archivedAt': archived ? FieldValue.serverTimestamp() : FieldValue.delete(),
+      });
+
+  /// Le coach modifie la fiche d'un élève. L'email, le rôle et le coach ne sont
+  /// jamais modifiés ici ; un champ optionnel laissé vide est supprimé du document.
+  Future<void> updateStudentProfile(
+    String uid, {
+    required String firstName,
+    required String lastName,
+    int? age,
+    int? heightCm,
+    num? weightKg,
+    String? goal,
+  }) {
+    final first = firstName.trim();
+    final last = lastName.trim();
+    final cleanGoal = goal?.trim();
+    return _doc(uid).update({
+      'firstName': first,
+      'lastName': last,
+      'displayName': '$first $last'.trim(),
+      'age': age ?? FieldValue.delete(),
+      'heightCm': heightCm ?? FieldValue.delete(),
+      'weightKg': weightKg ?? FieldValue.delete(),
+      'goal': (cleanGoal == null || cleanGoal.isEmpty) ? FieldValue.delete() : cleanGoal,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   /// Crée un compte élève SANS déconnecter le coach, grâce à une seconde
   /// instance Firebase dédiée (`FirebaseAuth.instanceFor`). Le profil Firestore
   /// est écrit depuis la session du coach (seule autorisée par les règles), puis

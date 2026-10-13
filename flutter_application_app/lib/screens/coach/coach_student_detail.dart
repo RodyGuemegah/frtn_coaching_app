@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/app_user.dart';
 import '../../models/session_model.dart';
 import '../../services/session_service.dart';
+import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text.dart';
 import '../../utils/coach_stats.dart';
@@ -12,6 +13,7 @@ import '../../widgets/feedback.dart';
 import '../../widgets/tags.dart';
 import '../session_detail.dart';
 import '../sessions_screen.dart';
+import 'coach_add_student.dart';
 import 'coach_create_session.dart';
 import 'coach_meal_plan.dart';
 
@@ -21,12 +23,61 @@ class CoachStudentDetailScreen extends StatefulWidget {
   const CoachStudentDetailScreen({super.key, required this.student});
 
   @override
-  State<CoachStudentDetailScreen> createState() => _CoachStudentDetailScreenState();
+  State<CoachStudentDetailScreen> createState() =>
+      _CoachStudentDetailScreenState();
 }
 
 class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
-  late final Stream<List<SessionModel>> _sessions = SessionService().watchSessions(widget.student.uid);
+  late final Stream<List<SessionModel>> _sessions = SessionService()
+      .watchSessions(widget.student.uid);
+
+  /// Profil écouté en direct : la fiche se met à jour après une modification.
+  late final Stream<AppUser?> _profile = UserService().watchUser(
+    widget.student.uid,
+  );
+
+  /// Dernière version connue de l'élève (celle reçue de la liste au départ).
+  late AppUser _student = widget.student;
   bool _validating = false;
+
+  void _editProfile() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CoachAddStudentScreen(initial: _student),
+      ),
+    );
+  }
+
+  /// Retire l'élève (archivage) après confirmation, ou le réactive.
+  Future<void> _setArchived(bool archived) async {
+    final name = _student.shortName;
+    if (archived) {
+      final ok = await showConfirmDialog(
+        context,
+        title: 'Retirer $name ?',
+        message:
+            '$name disparaîtra de ton dashboard et n\'aura plus accès à l\'app. '
+            'Son historique (séances, retours, repas) est conservé et tu pourras le réactiver à tout moment.',
+        confirmLabel: 'Retirer',
+      );
+      if (!ok || !mounted) return;
+    }
+    try {
+      await UserService().setArchived(_student.uid, archived);
+      if (!mounted) return;
+      showToast(
+        context,
+        archived
+            ? '$name a été retiré — retrouve-le dans « Anciens élèves »'
+            : '$name est de nouveau actif',
+        type: archived ? ToastType.info : ToastType.success,
+      );
+    } catch (e) {
+      if (mounted) {
+        showToast(context, friendlyErrorMessage(e), type: ToastType.error);
+      }
+    }
+  }
 
   Future<void> _validate(SessionModel session) async {
     if (_validating) return;
@@ -34,7 +85,10 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
     try {
       await SessionService().validateFeedback(widget.student.uid, session.id);
       if (!mounted) return;
-      showToast(context, 'Retour validé — ${widget.student.shortName} le verra dans son historique');
+      showToast(
+        context,
+        'Retour validé — ${_student.shortName} le verra dans son historique',
+      );
     } catch (e) {
       if (!mounted) return;
       showToast(context, friendlyErrorMessage(e), type: ToastType.error);
@@ -47,7 +101,17 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final student = widget.student;
+    return StreamBuilder<AppUser?>(
+      stream: _profile,
+      builder: (context, profileSnap) {
+        if (profileSnap.data != null) _student = profileSnap.data!;
+        return _buildPage(context);
+      },
+    );
+  }
+
+  Widget _buildPage(BuildContext context) {
+    final student = _student;
     final details = <String>[
       if (student.age != null) '${student.age} ans',
       if (student.heightCm != null) '${student.heightCm} cm',
@@ -60,6 +124,57 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.accent,
         title: Text(AppText.upper(student.nameOrEmail)),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (v) => switch (v) {
+              'edit' => _editProfile(),
+              'archive' => _setArchived(true),
+              _ => _setArchived(false),
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, size: 18),
+                    SizedBox(width: 10),
+                    Text('Modifier la fiche'),
+                  ],
+                ),
+              ),
+              if (student.archived)
+                const PopupMenuItem(
+                  value: 'restore',
+                  child: Row(
+                    children: [
+                      Icon(Icons.unarchive_outlined, size: 18),
+                      SizedBox(width: 10),
+                      Text('Réactiver l\'élève'),
+                    ],
+                  ),
+                )
+              else
+                const PopupMenuItem(
+                  value: 'archive',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.person_remove_outlined,
+                        size: 18,
+                        color: AppColors.accent,
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        'Retirer l\'élève',
+                        style: TextStyle(color: AppColors.accent),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
       body: StreamBuilder<List<SessionModel>>(
         stream: _sessions,
@@ -67,8 +182,10 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
           final sessions = snapshot.data ?? const <SessionModel>[];
           final stats = studentStats(sessions, DateTime.now());
           final last = stats.lastFeedbackSession;
-          final upcoming = sessions.where((s) => !s.isDone).toList()..sort((a, b) => a.date.compareTo(b.date));
-          final done = sessions.where((s) => s.isDone).toList()..sort((a, b) => b.date.compareTo(a.date));
+          final upcoming = sessions.where((s) => !s.isDone).toList()
+            ..sort((a, b) => a.date.compareTo(b.date));
+          final done = sessions.where((s) => s.isDone).toList()
+            ..sort((a, b) => b.date.compareTo(a.date));
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
@@ -81,20 +198,74 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(AppText.upper(student.nameOrEmail), style: AppText.heroTitle),
+                        Text(
+                          AppText.upper(student.nameOrEmail),
+                          style: AppText.heroTitle,
+                        ),
                         const SizedBox(height: 2),
                         Text(
-                          [if (student.goal != null) student.goal!, if (details.isNotEmpty) details.join(' · ')].join(' · '),
-                          style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                          [
+                            if (student.goal != null) student.goal!,
+                            if (details.isNotEmpty) details.join(' · '),
+                          ].join(' · '),
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 12,
+                          ),
                         ),
                         if (student.email.isNotEmpty)
-                          Text(student.email, style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
+                          Text(
+                            student.email,
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 11.5,
+                            ),
+                          ),
                       ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 18),
+              if (student.archived) ...[
+                AppCard(
+                  decoration: BoxDecoration(
+                    color: AppColors.panel,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.archive_outlined,
+                            color: AppColors.muted,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              '${student.shortName} a été retiré${student.archivedAt != null ? ' le ${formatDate(student.archivedAt!)}' : ''}. '
+                              'Son accès est suspendu, son historique reste consultable.',
+                              style: AppText.caption.copyWith(
+                                color: AppColors.text,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      GhostButton(
+                        label: '↺ Réactiver ${student.shortName}',
+                        onPressed: () => _setArchived(false),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               if (snapshot.hasError) ...[
                 ErrorCard(message: friendlyErrorMessage(snapshot.error!)),
                 const SizedBox(height: 12),
@@ -107,55 +278,101 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
                 crossAxisSpacing: 12,
                 childAspectRatio: 1.8,
                 children: [
-                  StatTile(value: stats.attendancePct == null ? '—' : '${stats.attendancePct}%', label: 'Assiduité'),
+                  StatTile(
+                    value: stats.attendancePct == null
+                        ? '—'
+                        : '${stats.attendancePct}%',
+                    label: 'Assiduité',
+                  ),
                   StatTile(value: '${stats.done}', label: 'Séances faites'),
                 ],
               ),
               const SectionLabel("Dernier retour de l'élève"),
               if (last == null)
-                const AppCard(child: Text('Aucun retour pour le moment.', style: TextStyle(color: AppColors.muted)))
+                const AppCard(
+                  child: Text(
+                    'Aucun retour pour le moment.',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
+                )
               else
                 _FeedbackCard(
                   session: last,
                   validating: _validating,
-                  onValidate: last.feedbackValidated ? null : () => _validate(last),
+                  onValidate: last.feedbackValidated
+                      ? null
+                      : () => _validate(last),
                   onReply: () => _snack('Messagerie bientôt disponible'),
                 ),
               const SectionLabel('Séances'),
-              if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData)
-                const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Center(child: CircularProgressIndicator()))
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  !snapshot.hasData)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
               else if (sessions.isEmpty)
-                const AppCard(child: Text('Aucune séance assignée.', style: TextStyle(color: AppColors.muted)))
+                const AppCard(
+                  child: Text(
+                    'Aucune séance assignée.',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
+                )
               else ...[
-                for (final s in upcoming) SessionRow(session: s, onTap: () => _open(s)),
-                for (final s in done) SessionRow(session: s, onTap: () => _open(s)),
+                for (final s in upcoming)
+                  SessionRow(session: s, onTap: () => _open(s)),
+                for (final s in done)
+                  SessionRow(session: s, onTap: () => _open(s)),
               ],
-              const SectionLabel('Actions rapides'),
-              AppCard(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => CoachCreateSessionScreen(students: [student], preselectedStudentId: student.uid),
+              if (!student.archived) ...[
+                const SectionLabel('Actions rapides'),
+                AppCard(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CoachCreateSessionScreen(
+                        students: [student],
+                        preselectedStudentId: student.uid,
+                      ),
+                    ),
+                  ),
+                  child: _actionRow(
+                    '💪',
+                    'Assigner une séance',
+                    'Nouvelle séance pour ${student.shortName}',
                   ),
                 ),
-                child: _actionRow('💪', 'Assigner une séance', 'Nouvelle séance pour ${student.shortName}'),
-              ),
-              const SizedBox(height: 10),
-              AppCard(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => CoachMealPlanScreen(student: student)),
+                const SizedBox(height: 10),
+                AppCard(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CoachMealPlanScreen(student: student),
+                    ),
+                  ),
+                  child: _actionRow(
+                    '🥗',
+                    'Plan alimentaire',
+                    'Repas jour par jour, macros, duplication',
+                  ),
                 ),
-                child: _actionRow('🥗', 'Plan alimentaire', 'Repas jour par jour, macros, duplication'),
-              ),
-              const SizedBox(height: 10),
-              AppCard(
-                onTap: () => _snack("Emploi du temps — bientôt disponible"),
-                child: _actionRow('📅', "Ajuster l'emploi du temps", 'Bientôt disponible'),
-              ),
-              const SizedBox(height: 10),
-              AppCard(
-                onTap: () => _snack('Mesures & progrès — bientôt disponible'),
-                child: _actionRow('📈', 'Voir les mesures & progrès', 'Bientôt disponible'),
-              ),
+                const SizedBox(height: 10),
+                AppCard(
+                  onTap: () => _snack("Emploi du temps — bientôt disponible"),
+                  child: _actionRow(
+                    '📅',
+                    "Ajuster l'emploi du temps",
+                    'Bientôt disponible',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                AppCard(
+                  onTap: () => _snack('Mesures & progrès — bientôt disponible'),
+                  child: _actionRow(
+                    '📈',
+                    'Voir les mesures & progrès',
+                    'Bientôt disponible',
+                  ),
+                ),
+              ],
             ],
           );
         },
@@ -170,7 +387,7 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
           uid: widget.student.uid,
           session: s,
           readOnly: true,
-          student: widget.student, // active Modifier / Supprimer
+          student: _student, // active Modifier / Supprimer
         ),
       ),
     );
@@ -185,9 +402,19 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700)),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppColors.text,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(subtitle, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+              Text(
+                subtitle,
+                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
             ],
           ),
         ),
@@ -203,7 +430,12 @@ class _FeedbackCard extends StatelessWidget {
   final VoidCallback? onValidate;
   final VoidCallback onReply;
 
-  const _FeedbackCard({required this.session, required this.validating, required this.onValidate, required this.onReply});
+  const _FeedbackCard({
+    required this.session,
+    required this.validating,
+    required this.onValidate,
+    required this.onReply,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -212,7 +444,11 @@ class _FeedbackCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.panel,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: session.feedbackValidated ? AppColors.border : AppColors.accent),
+        border: Border.all(
+          color: session.feedbackValidated
+              ? AppColors.border
+              : AppColors.accent,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,26 +458,53 @@ class _FeedbackCard extends StatelessWidget {
               Text(fb.ressenti.emoji, style: const TextStyle(fontSize: 22)),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(fb.ressenti.label, style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w700)),
+                child: Text(
+                  fb.ressenti.label,
+                  style: const TextStyle(
+                    color: AppColors.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               TagChip(
                 session.feedbackValidated ? 'Validé' : 'À valider',
-                style: session.feedbackValidated ? TagStyle.active : TagStyle.today,
+                style: session.feedbackValidated
+                    ? TagStyle.active
+                    : TagStyle.today,
               ),
             ],
           ),
           if (fb.comment != null) ...[
             const SizedBox(height: 8),
-            Text('« ${fb.comment} »', style: const TextStyle(color: AppColors.text, fontSize: 13, fontStyle: FontStyle.italic)),
+            Text(
+              '« ${fb.comment} »',
+              style: const TextStyle(
+                color: AppColors.text,
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
           ],
           const SizedBox(height: 6),
-          Text('${session.title} · ${formatDate(session.date)}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+          Text(
+            '${session.title} · ${formatDate(session.date)}',
+            style: const TextStyle(color: AppColors.muted, fontSize: 12),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: PrimaryButton(label: '✓ Valider', loading: validating, onPressed: onValidate)),
+              Expanded(
+                child: PrimaryButton(
+                  label: '✓ Valider',
+                  loading: validating,
+                  onPressed: onValidate,
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: GhostButton(label: '💬 Répondre', onPressed: onReply)),
+              Expanded(
+                child: GhostButton(label: '💬 Répondre', onPressed: onReply),
+              ),
             ],
           ),
         ],

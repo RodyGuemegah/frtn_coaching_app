@@ -27,6 +27,10 @@ class AppUser {
   final num? weightKg;
   final String? goal;
 
+  /// Élève retiré par son coach : masqué du dashboard, accès suspendu, historique conservé.
+  final bool archived;
+  final DateTime? archivedAt;
+
   const AppUser({
     required this.uid,
     required this.email,
@@ -41,6 +45,8 @@ class AppUser {
     this.heightCm,
     this.weightKg,
     this.goal,
+    this.archived = false,
+    this.archivedAt,
   });
 
   bool get isCoach => role == UserRole.coach;
@@ -79,6 +85,8 @@ class AppUser {
       heightCm: parseIntOrNull(data['heightCm']),
       weightKg: parseNumOrNull(data['weightKg']),
       goal: parseStringOrNull(data['goal']),
+      archived: data['archived'] == true,
+      archivedAt: parseDate(data['archivedAt']),
     );
   }
 
