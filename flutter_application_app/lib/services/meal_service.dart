@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/meal_model.dart';
+import '../utils/format.dart';
 
 class MealService {
   final _db = FirebaseFirestore.instance;
@@ -20,7 +21,7 @@ class MealService {
   /// Repas d'une journée (00:00 → 24:00), triés par heure.
   Stream<List<MealModel>> watchMealsForDay(String uid, DateTime day) {
     final start = DateTime(day.year, day.month, day.day);
-    return watchMealsBetween(uid, start, start.add(const Duration(days: 1)));
+    return watchMealsBetween(uid, start, addDays(start, 1));
   }
 
   /// Repas du jour d'un utilisateur, triés par heure.
@@ -63,7 +64,7 @@ class MealService {
         final start = DateTime(day.year, day.month, day.day);
         final existing = await _col(uid)
             .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-            .where('date', isLessThan: Timestamp.fromDate(start.add(const Duration(days: 1))))
+            .where('date', isLessThan: Timestamp.fromDate(addDays(start, 1)))
             .get();
         for (final d in existing.docs) {
           batch.delete(d.reference);

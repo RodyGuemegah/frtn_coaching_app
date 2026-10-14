@@ -1,4 +1,5 @@
 import 'package:flutter_application_app/models/app_user.dart';
+import 'package:flutter_application_app/models/program.dart';
 import 'package:flutter_application_app/models/session_model.dart';
 import 'package:flutter_application_app/utils/coach_stats.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -70,5 +71,42 @@ void main() {
     expect(stats.attendanceAvgPct, isNull);
     expect(stats.alerts, isEmpty);
     expect(stats.of('inconnu').pastTotal, 0);
+  });
+
+  group('programmes', () {
+    Program prog(String student, DateTime start, int weeks) =>
+        Program(id: '$student-$start', title: 'Prise de masse', startDate: start, weeks: weeks, studentId: student, coachId: 'coach');
+
+    test('compte les programmes à renouveler et crée une alerte', () {
+      final programs = [
+        prog('lucas', DateTime(2026, 8, 26), 8), // 8 semaines → fin le 21/10
+        prog('emma', DateTime(2026, 9, 1), 16), // loin de la fin
+      ];
+      // le 16/10 : Lucas finit le 21/10 (5 jours) → à renouveler ; Emma non.
+      final stats = coachStats([_lucas, _emma], const [], DateTime(2026, 10, 16), programs: programs);
+      expect(stats.programsToRenew, 1);
+      expect(stats.of('lucas').programNeedsRenewal, isTrue);
+      expect(stats.of('lucas').program, isNotNull);
+      expect(stats.of('emma').programNeedsRenewal, isFalse);
+      expect(stats.alerts.single.reason, AlertReason.programRenewal);
+    });
+
+    test('un retour en attente reste prioritaire sur le renouvellement', () {
+      final fbLucas = SessionFeedback(ressenti: Ressenti.correct, createdAt: DateTime(2026, 10, 15));
+      final stats = coachStats(
+        [_lucas],
+        [_s('lucas', DateTime(2026, 10, 15, 18), done: true, feedback: fbLucas)],
+        DateTime(2026, 10, 16),
+        programs: [prog('lucas', DateTime(2026, 8, 26), 8)],
+      );
+      expect(stats.alerts.single.reason, AlertReason.pendingFeedback);
+      expect(stats.programsToRenew, 1);
+    });
+
+    test('un élève sans programme n\'est pas « à renouveler »', () {
+      final stats = coachStats([_lucas], const [], DateTime(2026, 10, 16));
+      expect(stats.programsToRenew, 0);
+      expect(stats.of('lucas').program, isNull);
+    });
   });
 }

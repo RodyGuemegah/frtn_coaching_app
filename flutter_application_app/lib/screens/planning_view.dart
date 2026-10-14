@@ -43,7 +43,7 @@ class _PlanningViewState extends State<PlanningView> {
   late Stream<List<MealModel>> _meals = _watchMeals(_weekStart);
 
   Stream<List<MealModel>> _watchMeals(DateTime monday) =>
-      MealService().watchMealsBetween(widget.student.uid, monday, monday.add(const Duration(days: 7)));
+      MealService().watchMealsBetween(widget.student.uid, monday, addDays(monday, 7));
 
   void _selectDay(DateTime d) {
     final day = startOfDay(d);

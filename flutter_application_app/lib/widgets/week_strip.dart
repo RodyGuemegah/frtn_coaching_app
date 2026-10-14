@@ -19,7 +19,7 @@ class WeekStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final monday = startOfWeek(selected);
-    final sunday = monday.add(const Duration(days: 6));
+    final sunday = addDays(monday, 6);
     final now = DateTime.now();
     final label = monday.month == sunday.month
         ? '${monday.day} – ${sunday.day} ${_months[sunday.month - 1]}'
@@ -31,7 +31,7 @@ class WeekStrip extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.chevron_left, color: AppColors.muted),
-              onPressed: () => onSelect(selected.subtract(const Duration(days: 7))),
+              onPressed: () => onSelect(addDays(selected, -7)),
             ),
             Expanded(
               child: Text(label,
@@ -40,7 +40,7 @@ class WeekStrip extends StatelessWidget {
             ),
             IconButton(
               icon: const Icon(Icons.chevron_right, color: AppColors.muted),
-              onPressed: () => onSelect(selected.add(const Duration(days: 7))),
+              onPressed: () => onSelect(addDays(selected, 7)),
             ),
           ],
         ),
@@ -49,12 +49,12 @@ class WeekStrip extends StatelessWidget {
           children: [
             for (int i = 0; i < 7; i++) ...[
               Expanded(child: _DayCell(
-                day: monday.add(Duration(days: i)),
+                day: addDays(monday, i),
                 letter: _letters[i],
-                selected: isSameDay(monday.add(Duration(days: i)), selected),
-                today: isSameDay(monday.add(Duration(days: i)), now),
-                marked: marked.any((d) => isSameDay(d, monday.add(Duration(days: i)))),
-                onTap: () => onSelect(monday.add(Duration(days: i))),
+                selected: isSameDay(addDays(monday, i), selected),
+                today: isSameDay(addDays(monday, i), now),
+                marked: marked.any((d) => isSameDay(d, addDays(monday, i))),
+                onTap: () => onSelect(addDays(monday, i)),
               )),
               if (i < 6) const SizedBox(width: 6),
             ],

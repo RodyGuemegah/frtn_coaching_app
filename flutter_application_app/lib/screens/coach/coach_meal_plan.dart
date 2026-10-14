@@ -31,7 +31,7 @@ class _CoachMealPlanScreenState extends State<CoachMealPlanScreen> {
   late Stream<List<MealModel>> _weekStream = _watchWeek(_weekStart);
 
   Stream<List<MealModel>> _watchWeek(DateTime monday) =>
-      _service.watchMealsBetween(widget.student.uid, monday, monday.add(const Duration(days: 7)));
+      _service.watchMealsBetween(widget.student.uid, monday, addDays(monday, 7));
 
   void _selectDay(DateTime d) {
     final day = startOfDay(d);
@@ -255,7 +255,7 @@ class _DuplicateDialog extends StatefulWidget {
 }
 
 class _DuplicateDialogState extends State<_DuplicateDialog> {
-  late final List<DateTime> _candidates = [for (int i = 1; i <= 7; i++) widget.from.add(Duration(days: i))];
+  late final List<DateTime> _candidates = [for (int i = 1; i <= 7; i++) addDays(widget.from, i)];
   final Set<int> _selected = {};
   bool _replace = true;
 

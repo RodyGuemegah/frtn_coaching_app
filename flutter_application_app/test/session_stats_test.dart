@@ -1,4 +1,5 @@
 import 'package:flutter_application_app/models/session_model.dart';
+import 'package:flutter_application_app/utils/format.dart';
 import 'package:flutter_application_app/utils/session_stats.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -69,5 +70,23 @@ void main() {
 
   test('totalDone', () {
     expect(totalDone([_s('a', now, done: true), _s('b', now), _s('c', now, done: true)]), 2);
+  });
+
+  group("changement d'heure (25/10/2026)", () {
+    test('addDays reste sur des jours entiers', () {
+      expect(addDays(DateTime(2026, 10, 19), 6), DateTime(2026, 10, 25));
+      expect(addDays(DateTime(2026, 10, 19), 7), DateTime(2026, 10, 26));
+      expect(addDays(DateTime(2026, 10, 26), -1), DateTime(2026, 10, 25));
+    });
+
+    test('startOfWeek du lundi après le changement = lundi 26 à minuit', () {
+      expect(startOfWeek(DateTime(2026, 10, 28, 12)), DateTime(2026, 10, 26));
+      expect(startOfWeek(DateTime(2026, 10, 25, 22)), DateTime(2026, 10, 19));
+    });
+
+    test('weekCount compte bien la séance du dimanche du changement', () {
+      final list = [_s('dimanche-25', DateTime(2026, 10, 25, 23, 30))];
+      expect(weekCount(list, DateTime(2026, 10, 21)).total, 1);
+    });
   });
 }

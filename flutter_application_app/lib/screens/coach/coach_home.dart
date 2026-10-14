@@ -3,15 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/app_user.dart';
 import '../../models/chat_models.dart';
+import '../../models/program.dart';
 import '../../models/session_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
+import '../../services/program_service.dart';
 import '../../services/session_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/coach_stats.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
+import '../../utils/program_stats.dart';
 import '../../widgets/cartes.dart';
 import '../../widgets/current_user_scope.dart';
 import '../../widgets/tags.dart';
@@ -60,6 +63,8 @@ class _CoachShellState extends State<CoachShell> {
   StreamSubscription<List<AppUser>>? _studentsSub;
   StreamSubscription<List<SessionModel>>? _sessionsSub;
   StreamSubscription<List<ChatThread>>? _threadsSub;
+  StreamSubscription<List<Program>>? _programsSub;
+  List<Program> _programs = const [];
   Map<String, ChatThread> _threads = const {};
   Object? _threadsError;
   List<AppUser> _students = const [];
@@ -106,12 +111,18 @@ class _CoachShellState extends State<CoachShell> {
       }),
       onError: (Object e) => setState(() => _threadsError = e),
     );
+    // Programmes : en cas d'erreur (ex : index en cours de création), le dashboard reste utilisable.
+    _programsSub = ProgramService().watchCoachPrograms(uid).listen(
+      (list) => setState(() => _programs = list),
+      onError: (_) {},
+    );
   }
 
   void _retry() {
     _studentsSub?.cancel();
     _sessionsSub?.cancel();
     _threadsSub?.cancel();
+    _programsSub?.cancel();
     _threadsError = null;
     setState(() {
       _studentsLoaded = false;
@@ -129,6 +140,7 @@ class _CoachShellState extends State<CoachShell> {
     _studentsSub?.cancel();
     _sessionsSub?.cancel();
     _threadsSub?.cancel();
+    _programsSub?.cancel();
     super.dispose();
   }
 
@@ -145,7 +157,7 @@ class _CoachShellState extends State<CoachShell> {
       students: active,
       archived: archived,
       sessions: activeSessions,
-      stats: coachStats(active, activeSessions, DateTime.now()),
+      stats: coachStats(active, activeSessions, DateTime.now(), programs: _programs),
       loading: !(_studentsLoaded && _sessionsLoaded),
       studentsError: _studentsError,
       sessionsError: _sessionsError,
@@ -248,8 +260,7 @@ class _CoachDashboardTab extends StatelessWidget {
             StatTile(value: '${stats.sessionsToday}', label: "Séances aujourd'hui"),
             StatTile(value: '${stats.pendingFeedback}', label: 'Retours à valider'),
             StatTile(value: stats.attendanceAvgPct == null ? '—' : '${stats.attendanceAvgPct}%', label: 'Assiduité moyenne'),
-            // Aucun modèle de "programme" n'existe encore : placeholder assumé.
-            const StatTile(value: '—', label: 'Programmes à renouveler'),
+            StatTile(value: '${stats.programsToRenew}', label: 'Programmes à renouveler'),
           ],
         ),
         if (stats.alerts.isNotEmpty) ...[
@@ -394,6 +405,13 @@ class _AlertRow extends StatelessWidget {
         subtitle = '${st.pendingFeedback} retour${st.pendingFeedback > 1 ? 's' : ''} à valider${title != null ? ' · $title' : ''}';
         tag = 'Valider';
         break;
+      case AlertReason.programRenewal:
+        final p = st.program!;
+        subtitle = programStatus(p, DateTime.now()) == ProgramStatus.finished
+            ? '« ${p.title} » terminé — aucun programme prévu'
+            : '« ${p.title} » se termine dans ${daysLeft(p, DateTime.now())} j';
+        tag = 'Renouveler';
+        break;
       case AlertReason.lowAttendance:
         subtitle = 'Assiduité ${st.attendancePct}% sur ${st.pastTotal} séances';
         tag = 'Relancer';
@@ -455,8 +473,10 @@ class StudentRow extends StatelessWidget {
       tagStyle = TagStyle.active;
       tagLabel = 'OK';
     }
+    final program = stats.program;
     final parts = <String>[
-      if (student.goal != null) student.goal!,
+      if (program != null) ...[program.title, programWeekLabel(program, DateTime.now())]
+      else if (student.goal != null) student.goal!,
       if (stats.attendancePct != null) 'Assiduité ${stats.attendancePct}%'
       else if (stats.next != null) 'Prochaine : ${sessionDateTag(stats.next!.date)}'
       else 'Aucune séance',

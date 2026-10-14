@@ -1,6 +1,8 @@
 import '../models/app_user.dart';
+import '../models/program.dart';
 import '../models/session_model.dart';
 import 'format.dart';
+import 'program_stats.dart';
 import 'session_stats.dart';
 
 /// Calculs purs (testables sans Firebase) pour l'espace coach.
@@ -23,6 +25,12 @@ class StudentStats {
 
   final SessionModel? next;
 
+  /// Programme courant (en cours, sinon à venir, sinon le dernier terminé).
+  final Program? program;
+
+  /// Le programme est-il à renouveler (fin ≤ 7 j ou terminé sans suite) ?
+  final bool programNeedsRenewal;
+
   const StudentStats({
     required this.pastTotal,
     required this.done,
@@ -30,6 +38,8 @@ class StudentStats {
     required this.lastFeedbackSession,
     required this.pendingFeedback,
     required this.next,
+    this.program,
+    this.programNeedsRenewal = false,
   });
 
   bool get hasPendingFeedback => pendingFeedback > 0;
@@ -47,7 +57,7 @@ class StudentStats {
   );
 }
 
-StudentStats studentStats(List<SessionModel> sessions, DateTime now) {
+StudentStats studentStats(List<SessionModel> sessions, DateTime now, {List<Program> programs = const []}) {
   final past = sessions.where((s) => s.date.isBefore(now)).toList();
   final donePast = past.where((s) => s.isDone).length;
 
@@ -66,10 +76,12 @@ StudentStats studentStats(List<SessionModel> sessions, DateTime now) {
     lastFeedbackSession: lastFeedback,
     pendingFeedback: sessions.where((s) => s.hasPendingFeedback).length,
     next: nextSession(sessions, now),
+    program: currentProgram(programs, now),
+    programNeedsRenewal: needsRenewal(programs, now),
   );
 }
 
-enum AlertReason { pendingFeedback, lowAttendance }
+enum AlertReason { pendingFeedback, programRenewal, lowAttendance }
 
 class StudentAlert {
   final AppUser student;
@@ -83,6 +95,9 @@ class CoachStats {
   final int sessionsToday;
   final int pendingFeedback;
   final int? attendanceAvgPct;
+
+  /// Nombre d'élèves dont le programme est à renouveler.
+  final int programsToRenew;
   final List<StudentAlert> alerts;
   final Map<String, StudentStats> byStudent;
 
@@ -91,6 +106,7 @@ class CoachStats {
     required this.sessionsToday,
     required this.pendingFeedback,
     required this.attendanceAvgPct,
+    this.programsToRenew = 0,
     required this.alerts,
     required this.byStudent,
   });
@@ -98,15 +114,26 @@ class CoachStats {
   StudentStats of(String uid) => byStudent[uid] ?? StudentStats.empty;
 }
 
-/// [allSessions] = séances assignées par le coach (toutes élèves confondus).
-CoachStats coachStats(List<AppUser> students, List<SessionModel> allSessions, DateTime now) {
+/// [allSessions] = séances assignées par le coach (tous élèves confondus) ;
+/// [programs] = programmes créés par le coach (tous élèves confondus).
+CoachStats coachStats(
+  List<AppUser> students,
+  List<SessionModel> allSessions,
+  DateTime now, {
+  List<Program> programs = const [],
+}) {
   final grouped = <String, List<SessionModel>>{};
   for (final s in allSessions) {
     grouped.putIfAbsent(s.studentId, () => []).add(s);
   }
+  final programsByStudent = <String, List<Program>>{};
+  for (final p in programs) {
+    programsByStudent.putIfAbsent(p.studentId, () => []).add(p);
+  }
 
   final byStudent = <String, StudentStats>{
-    for (final st in students) st.uid: studentStats(grouped[st.uid] ?? const [], now),
+    for (final st in students)
+      st.uid: studentStats(grouped[st.uid] ?? const [], now, programs: programsByStudent[st.uid] ?? const []),
   };
 
   final past = allSessions.where((s) => s.date.isBefore(now)).toList();
@@ -115,8 +142,11 @@ CoachStats coachStats(List<AppUser> students, List<SessionModel> allSessions, Da
   final alerts = <StudentAlert>[];
   for (final st in students) {
     final stats = byStudent[st.uid]!;
+    // Une seule alerte par élève, par ordre de priorité.
     if (stats.hasPendingFeedback) {
       alerts.add(StudentAlert(student: st, reason: AlertReason.pendingFeedback, stats: stats));
+    } else if (stats.programNeedsRenewal) {
+      alerts.add(StudentAlert(student: st, reason: AlertReason.programRenewal, stats: stats));
     } else if (stats.lowAttendance) {
       alerts.add(StudentAlert(student: st, reason: AlertReason.lowAttendance, stats: stats));
     }
@@ -127,6 +157,7 @@ CoachStats coachStats(List<AppUser> students, List<SessionModel> allSessions, Da
     sessionsToday: allSessions.where((s) => isSameDay(s.date, now)).length,
     pendingFeedback: allSessions.where((s) => s.hasPendingFeedback).length,
     attendanceAvgPct: attendanceAvg,
+    programsToRenew: byStudent.values.where((s) => s.programNeedsRenewal).length,
     alerts: alerts,
     byStudent: byStudent,
   );

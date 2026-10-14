@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import '../models/app_user.dart';
 import '../models/meal_model.dart';
+import '../models/program.dart';
 import '../models/session_model.dart';
 import '../models/chat_models.dart';
 import '../services/meal_service.dart';
+import '../services/program_service.dart';
 import '../services/session_service.dart';
 import '../services/chat_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/errors.dart';
 import '../utils/format.dart';
+import '../utils/program_stats.dart';
 import '../utils/session_stats.dart';
 import '../widgets/cartes.dart';
 import '../widgets/current_user_scope.dart';
+import '../widgets/program_card.dart';
 import '../widgets/tags.dart';
 import 'nutrition.dart';
 import 'planning.dart';
@@ -72,6 +76,7 @@ class _HomeTab extends StatefulWidget {
 class _HomeTabState extends State<_HomeTab> {
   late final Stream<List<SessionModel>> _sessions = SessionService().watchSessions(widget.user.uid);
   late final Stream<List<MealModel>> _meals = MealService().watchTodayMeals(widget.user.uid);
+  late final Stream<List<Program>> _programs = ProgramService().watchPrograms(widget.user.uid);
 
   @override
   Widget build(BuildContext context) {
@@ -128,6 +133,21 @@ class _HomeTabState extends State<_HomeTab> {
                     StatTile(value: attendance == null ? '—' : '$attendance%', label: 'Assiduité du mois'),
                     StatTile(value: kcalTarget > 0 ? '$kcalTarget' : '—', label: 'Objectif kcal / jour'),
                     StatTile(value: '${totalDone(sessions)}', label: 'Séances complétées'),
+                  ],
+                );
+              },
+            ),
+            // « Objectif du programme » (masqué tant que le coach n'a créé aucun programme).
+            StreamBuilder<List<Program>>(
+              stream: _programs,
+              builder: (context, programSnap) {
+                final program = currentProgram(programSnap.data ?? const [], DateTime.now());
+                if (program == null) return const SizedBox.shrink();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SectionLabel('Objectif du programme'),
+                    ProgramCard(program: program),
                   ],
                 );
               },

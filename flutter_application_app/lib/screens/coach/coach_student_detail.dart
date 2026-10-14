@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/app_user.dart';
+import '../../models/program.dart';
 import '../../models/session_model.dart';
+import '../../services/program_service.dart';
 import '../../services/session_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
@@ -8,9 +10,11 @@ import '../../theme/app_text.dart';
 import '../../utils/coach_stats.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
+import '../../utils/program_stats.dart';
 import '../../widgets/cartes.dart';
 import '../../widgets/current_user_scope.dart';
 import '../../widgets/feedback.dart';
+import '../../widgets/program_card.dart';
 import '../../widgets/tags.dart';
 import '../session_detail.dart';
 import '../chat_screen.dart';
@@ -20,6 +24,7 @@ import '../sessions_screen.dart';
 import 'coach_add_student.dart';
 import 'coach_create_session.dart';
 import 'coach_meal_plan.dart';
+import 'program_editor.dart';
 
 /// Fiche élève côté coach : stats, dernier retour, séances, actions rapides.
 class CoachStudentDetailScreen extends StatefulWidget {
@@ -304,6 +309,8 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
                   StatTile(value: '${stats.done}', label: 'Séances faites'),
                 ],
               ),
+              const SectionLabel('Programme'),
+              _ProgramSection(student: student),
               const SectionLabel('Suivi du poids'),
               WeightSummaryCard(student: student, coachMode: true),
               const SectionLabel("Dernier retour de l'élève"),
@@ -537,6 +544,89 @@ class _FeedbackCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+/// Section « Programme » de la fiche élève : programme courant + actions
+/// (créer, renouveler, modifier). Écoute les programmes de l'élève en direct.
+class _ProgramSection extends StatefulWidget {
+  final AppUser student;
+  const _ProgramSection({required this.student});
+
+  @override
+  State<_ProgramSection> createState() => _ProgramSectionState();
+}
+
+class _ProgramSectionState extends State<_ProgramSection> {
+  late final Stream<List<Program>> _stream = ProgramService().watchPrograms(widget.student.uid);
+
+  void _open({Program? initial}) {
+    showProgramEditor(
+      context,
+      student: widget.student,
+      coach: CurrentUserScope.of(context),
+      initial: initial,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Program>>(
+      stream: _stream,
+      builder: (context, snap) {
+        if (snap.hasError) return ErrorCard(message: friendlyErrorMessage(snap.error!));
+        final programs = snap.data ?? const <Program>[];
+        final now = DateTime.now();
+        final current = currentProgram(programs, now);
+        final renew = needsRenewal(programs, now);
+        final archived = widget.student.archived;
+
+        if (current == null) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const NoticeCard('Aucun programme en cours. Crée-en un pour suivre la progression semaine par semaine.',
+                  icon: Icons.flag_outlined),
+              if (!archived) ...[
+                const SizedBox(height: 10),
+                PrimaryButton(label: '+ Créer un programme', onPressed: () => _open()),
+              ],
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ProgramCard(
+              program: current,
+              showRenewal: true,
+              needsRenewalFlag: renew,
+              onTap: archived ? null : () => _open(initial: current),
+            ),
+            if (!archived) ...[
+              const SizedBox(height: 10),
+              if (renew)
+                PrimaryButton(
+                  label: '↻ Renouveler le programme',
+                  onPressed: () => _open(initial: renewalOf(current, now)),
+                )
+              else
+                GhostButton(label: '+ Nouveau programme', onPressed: () => _open()),
+            ],
+            if (programs.length > 1) ...[
+              const SizedBox(height: 6),
+              Text(
+                '${programs.length - 1} autre${programs.length > 2 ? 's' : ''} programme${programs.length > 2 ? 's' : ''} '
+                'dans l\'historique',
+                style: AppText.caption,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

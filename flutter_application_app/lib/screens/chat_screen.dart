@@ -216,7 +216,7 @@ class _DaySeparator extends StatelessWidget {
     final String label;
     if (isSameDay(date, now)) {
       label = "Aujourd'hui";
-    } else if (isSameDay(date, now.subtract(const Duration(days: 1)))) {
+    } else if (isSameDay(date, addDays(now, -1))) {
       label = 'Hier';
     } else {
       label = formatDayLong(date);

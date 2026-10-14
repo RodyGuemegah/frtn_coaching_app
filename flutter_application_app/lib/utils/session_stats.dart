@@ -1,11 +1,12 @@
 import '../models/session_model.dart';
+import 'format.dart';
 
 /// Calculs purs (testables sans Firebase) sur une liste de séances.
 
 DateTime startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
 
 /// Lundi 00:00 de la semaine de [d].
-DateTime startOfWeek(DateTime d) => startOfDay(d).subtract(Duration(days: d.weekday - 1));
+DateTime startOfWeek(DateTime d) => addDays(startOfDay(d), -(d.weekday - 1));
 
 /// Prochaine séance non faite, à partir d'aujourd'hui (les séances manquées du passé sont ignorées).
 SessionModel? nextSession(List<SessionModel> sessions, DateTime now) {
@@ -18,7 +19,7 @@ SessionModel? nextSession(List<SessionModel> sessions, DateTime now) {
 /// Séances de la semaine courante (lundi 00:00 inclus → lundi suivant exclu).
 ({int done, int total}) weekCount(List<SessionModel> sessions, DateTime now) {
   final start = startOfWeek(now);
-  final end = start.add(const Duration(days: 7));
+  final end = addDays(start, 7);
   final week = sessions.where((s) => !s.date.isBefore(start) && s.date.isBefore(end)).toList();
   return (done: week.where((s) => s.isDone).length, total: week.length);
 }

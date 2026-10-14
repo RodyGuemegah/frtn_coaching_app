@@ -71,6 +71,22 @@ service cloud.firestore {
         }
       }
 
+      // Programmes : créés et gérés par le coach de l'élève ; l'élève peut les consulter.
+      match /programs/{pid} {
+        allow read: if signedIn() && (me() == uid || isCoachOf(uid));
+        allow delete: if isCoachOf(uid);
+        allow create, update: if isCoachOf(uid)
+          && request.resource.data.studentId == uid
+          && request.resource.data.coachId == me()
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 80
+          && request.resource.data.startDate is timestamp
+          && request.resource.data.weeks is int
+          && request.resource.data.weeks >= 1
+          && request.resource.data.weeks <= 52;
+      }
+
       // Mesures & progrès : pesées saisies par l'élève ou son coach, valeurs réalistes.
       match /measurements/{mid} {
         allow read, delete: if signedIn() && (me() == uid || isCoachOf(uid));
@@ -114,6 +130,11 @@ service cloud.firestore {
         allow update: if isCoachOf(uid)
           || (me() == uid && changedKeys().hasOnly(['eaten']));
       }
+    }
+
+    // Requête collectionGroup('programs') du dashboard coach (filtrée par coachId).
+    match /{path=**}/programs/{pid} {
+      allow read: if signedIn() && resource.data.coachId == me();
     }
 
     // Requête collectionGroup('threads') de l'onglet Messages du coach (filtrée par coachId).

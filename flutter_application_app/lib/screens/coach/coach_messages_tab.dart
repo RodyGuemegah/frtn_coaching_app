@@ -130,7 +130,7 @@ class _ThreadRow extends StatelessWidget {
   static String _when(DateTime d) {
     final now = DateTime.now();
     if (isSameDay(d, now)) return formatTime(d);
-    if (isSameDay(d, now.subtract(const Duration(days: 1)))) return 'Hier';
+    if (isSameDay(d, addDays(now, -1))) return 'Hier';
     return formatDate(d);
   }
 }
