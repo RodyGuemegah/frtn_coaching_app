@@ -14,6 +14,8 @@ import '../../widgets/feedback.dart';
 import '../../widgets/tags.dart';
 import '../session_detail.dart';
 import '../chat_screen.dart';
+import '../measurements_screen.dart';
+import '../planning.dart';
 import '../sessions_screen.dart';
 import 'coach_add_student.dart';
 import 'coach_create_session.dart';
@@ -113,7 +115,6 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
     }
   }
 
-  void _snack(String text) => showToast(context, text, type: ToastType.info);
 
   @override
   Widget build(BuildContext context) {
@@ -303,6 +304,8 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
                   StatTile(value: '${stats.done}', label: 'Séances faites'),
                 ],
               ),
+              const SectionLabel('Suivi du poids'),
+              WeightSummaryCard(student: student, coachMode: true),
               const SectionLabel("Dernier retour de l'élève"),
               if (last == null)
                 const AppCard(
@@ -377,20 +380,24 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
                 ),
                 const SizedBox(height: 10),
                 AppCard(
-                  onTap: () => _snack("Emploi du temps — bientôt disponible"),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => CoachPlanningScreen(student: student)),
+                  ),
                   child: _actionRow(
                     '📅',
                     "Ajuster l'emploi du temps",
-                    'Bientôt disponible',
+                    'Séances, repas et créneaux de la semaine',
                   ),
                 ),
                 const SizedBox(height: 10),
                 AppCard(
-                  onTap: () => _snack('Mesures & progrès — bientôt disponible'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => MeasurementsScreen(student: student, coachMode: true)),
+                  ),
                   child: _actionRow(
                     '📈',
                     'Voir les mesures & progrès',
-                    'Bientôt disponible',
+                    'Pesées, tour de taille, masse grasse',
                   ),
                 ),
               ],

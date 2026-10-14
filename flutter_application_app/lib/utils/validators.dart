@@ -60,3 +60,24 @@ List<TextInputFormatter> intInput({int maxDigits = 3}) => [
 List<TextInputFormatter> decimalInput({int maxIntDigits = 3}) => [
   FilteringTextInputFormatter.allow(RegExp('^\\d{0,$maxIntDigits}([.,]\\d?)?')),
 ];
+
+/// Bornes des autres mesures corporelles.
+class MeasureLimits {
+  MeasureLimits._();
+
+  static const minWaistCm = 40;
+  static const maxWaistCm = 200;
+  static const minBodyFatPct = 2;
+  static const maxBodyFatPct = 70;
+}
+
+String? waistValidator(String? v) =>
+    optionalNumInRange(MeasureLimits.minWaistCm, MeasureLimits.maxWaistCm, ' cm')(v);
+String? bodyFatValidator(String? v) =>
+    optionalNumInRange(MeasureLimits.minBodyFatPct, MeasureLimits.maxBodyFatPct, ' %')(v);
+
+/// Poids obligatoire (pesée) dans les bornes du profil.
+String? requiredWeightValidator(String? v) {
+  if ((v ?? '').trim().isEmpty) return 'Requis';
+  return weightValidator(v);
+}

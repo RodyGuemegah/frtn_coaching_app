@@ -4,6 +4,7 @@ import '../theme/app_colors.dart';
 import '../widgets/cartes.dart';
 import '../widgets/current_user_scope.dart';
 import 'chat_screen.dart';
+import 'measurements_screen.dart';
 
 class ProfilScreen extends StatelessWidget {
   const ProfilScreen({super.key});
@@ -52,6 +53,8 @@ class ProfilScreen extends StatelessWidget {
             ),
           ),
         ],
+        const SectionLabel('Suivi du poids'),
+        WeightSummaryCard(student: user),
         const SectionLabel('Mon coach'),
         AppCard(
           onTap: user.coachId == null

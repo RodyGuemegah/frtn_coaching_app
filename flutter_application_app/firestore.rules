@@ -71,6 +71,38 @@ service cloud.firestore {
         }
       }
 
+      // Mesures & progrès : pesées saisies par l'élève ou son coach, valeurs réalistes.
+      match /measurements/{mid} {
+        allow read, delete: if signedIn() && (me() == uid || isCoachOf(uid));
+        allow create, update: if signedIn() && (me() == uid || isCoachOf(uid))
+          && request.resource.data.date is timestamp
+          // Marge d'1 jour : tolère une horloge de téléphone en avance, bloque les vraies dates futures.
+          && request.resource.data.date <= request.time + duration.value(1, 'd')
+          && request.resource.data.weightKg is number
+          && request.resource.data.weightKg >= 25
+          && request.resource.data.weightKg <= 300
+          && (!('waistCm' in request.resource.data)
+              || (request.resource.data.waistCm is number
+                  && request.resource.data.waistCm >= 40 && request.resource.data.waistCm <= 200))
+          && (!('bodyFatPct' in request.resource.data)
+              || (request.resource.data.bodyFatPct is number
+                  && request.resource.data.bodyFatPct >= 2 && request.resource.data.bodyFatPct <= 70));
+      }
+
+      // Emploi du temps : créneaux récurrents, gérés par l'élève ET son coach.
+      match /schedule/{sid} {
+        allow read, delete: if signedIn() && (me() == uid || isCoachOf(uid));
+        allow create, update: if signedIn() && (me() == uid || isCoachOf(uid))
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 80
+          && request.resource.data.weekdays is list
+          && request.resource.data.weekdays.size() >= 1
+          && request.resource.data.weekdays.size() <= 7
+          && request.resource.data.startMinutes is int
+          && request.resource.data.startMinutes >= 0
+          && request.resource.data.startMinutes < 1440;
+      }
+
       // Modèles de séances : bibliothèque privée de chaque coach.
       match /templates/{tid} {
         allow read, write: if signedIn() && me() == uid && isCoach();
