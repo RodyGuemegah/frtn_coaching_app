@@ -14,6 +14,7 @@ import '../widgets/feedback.dart';
 import '../widgets/ressenti_sheet.dart';
 import '../widgets/tags.dart';
 import 'coach/coach_create_session.dart';
+import 'chat_screen.dart';
 
 /// Détail d'une séance. Côté élève : permet de la marquer comme faite avec un
 /// ressenti. Côté coach (`readOnly`) : consultation, et — si [student] est
@@ -281,11 +282,22 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       if (s.isDone) _DoneCard(session: s)
       else if (!widget.readOnly)
         PrimaryButton(label: '✓ Marquer la séance comme faite', loading: _saving, onPressed: () => _markDone(s)),
-      if (!widget.readOnly) ...[
+      if (!widget.readOnly && CurrentUserScope.of(context).coachId != null) ...[
         const SizedBox(height: 10),
         GhostButton(
           label: '💬 Envoyer un message au coach',
-          onPressed: () => showToast(context, 'Messagerie bientôt disponible', type: ToastType.info),
+          onPressed: () {
+            final me = CurrentUserScope.of(context);
+            Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => ChatScreen(
+                student: me,
+                coachUid: me.coachId!,
+                coachName: me.coachName,
+                sessionId: s.id,
+                sessionTitle: s.title,
+              ),
+            ));
+          },
         ),
       ],
     ];

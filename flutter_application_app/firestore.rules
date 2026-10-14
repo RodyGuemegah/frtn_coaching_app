@@ -47,6 +47,30 @@ service cloud.firestore {
         allow delete: if isCoachOf(uid);
       }
 
+      // Messagerie : une conversation par élève, partagée avec SON coach uniquement.
+      match /threads/{tid} {
+        function participant() { return signedIn() && (me() == uid || isCoachOf(uid)); }
+
+        allow read: if participant();
+        // Le résumé doit toujours pointer vers cet élève et son vrai coach.
+        allow create, update: if participant()
+          && request.resource.data.studentId == uid
+          && request.resource.data.coachId == profileOf(uid).coachId;
+        allow delete: if false;
+
+        match /messages/{mid} {
+          allow read: if participant();
+          // On n'écrit qu'en son propre nom, un texte non vide de 2000 caractères max.
+          allow create: if participant()
+            && request.resource.data.senderId == me()
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0
+            && request.resource.data.text.size() <= 2000;
+          // Un message envoyé n'est ni modifiable ni supprimable.
+          allow update, delete: if false;
+        }
+      }
+
       // Modèles de séances : bibliothèque privée de chaque coach.
       match /templates/{tid} {
         allow read, write: if signedIn() && me() == uid && isCoach();
@@ -58,6 +82,11 @@ service cloud.firestore {
         allow update: if isCoachOf(uid)
           || (me() == uid && changedKeys().hasOnly(['eaten']));
       }
+    }
+
+    // Requête collectionGroup('threads') de l'onglet Messages du coach (filtrée par coachId).
+    match /{path=**}/threads/{tid} {
+      allow read: if signedIn() && resource.data.coachId == me();
     }
 
     // Requête collectionGroup('sessions') du dashboard coach (filtrée par coachId).

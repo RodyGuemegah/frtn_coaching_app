@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../models/app_user.dart';
 import '../models/meal_model.dart';
 import '../models/session_model.dart';
+import '../models/chat_models.dart';
 import '../services/meal_service.dart';
 import '../services/session_service.dart';
+import '../services/chat_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/errors.dart';
 import '../utils/format.dart';
@@ -15,6 +17,7 @@ import 'nutrition.dart';
 import 'planning.dart';
 import 'profil.dart';
 import 'session_detail.dart';
+import 'chat_screen.dart';
 import 'sessions_screen.dart';
 import '../theme/app_text.dart';
 
@@ -91,6 +94,10 @@ class _HomeTabState extends State<_HomeTab> {
                 Expanded(
                   child: ScreenTitle('Salut ${user.shortName} 👋', subtitle: todayLabel(now)),
                 ),
+                if (user.coachId != null) ...[
+                  _ChatButton(user: user),
+                  const SizedBox(width: 10),
+                ],
                 GestureDetector(onTap: () => widget.onOpenTab(4), child: InitialsAvatar(user.initials)),
               ],
             ),
@@ -223,6 +230,56 @@ class _NextSessionCard extends StatelessWidget {
           PrimaryButton(label: 'Voir la séance →', onPressed: onOpen),
         ],
       ),
+    );
+  }
+}
+
+/// Bouton 💬 de l'accueil élève : ouvre la conversation avec le coach,
+/// avec la pastille du nombre de messages non lus.
+class _ChatButton extends StatefulWidget {
+  final AppUser user;
+  const _ChatButton({required this.user});
+
+  @override
+  State<_ChatButton> createState() => _ChatButtonState();
+}
+
+class _ChatButtonState extends State<_ChatButton> {
+  late final Stream<ChatThread?> _thread = ChatService().watchThread(widget.user.uid);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<ChatThread?>(
+      stream: _thread,
+      builder: (context, snap) {
+        final unread = snap.data?.unreadForStudent ?? 0;
+        return Material(
+          color: AppColors.card,
+          shape: const CircleBorder(side: BorderSide(color: AppColors.border)),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => ChatScreen(
+                student: widget.user,
+                coachUid: widget.user.coachId!,
+                coachName: widget.user.coachName,
+              ),
+            )),
+            child: SizedBox(
+              width: 42,
+              height: 42,
+              child: Center(
+                child: Badge(
+                  isLabelVisible: unread > 0,
+                  label: Text(unread > 99 ? '99+' : '$unread'),
+                  backgroundColor: AppColors.accent,
+                  child: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.text, size: 20),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../../models/app_user.dart';
+import '../../models/chat_models.dart';
 import '../../models/session_model.dart';
 import '../../services/auth_service.dart';
+import '../../services/chat_service.dart';
 import '../../services/session_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
@@ -14,6 +16,7 @@ import '../../widgets/cartes.dart';
 import '../../widgets/current_user_scope.dart';
 import '../../widgets/tags.dart';
 import 'coach_add_student.dart';
+import 'coach_messages_tab.dart';
 import 'coach_create_session.dart';
 import 'coach_student_detail.dart';
 import '../../theme/app_text.dart';
@@ -43,8 +46,8 @@ class CoachData {
   });
 }
 
-/// Coquille de l'espace coach : dashboard / élèves / créer une séance.
-/// Les deux streams (élèves, séances assignées) vivent ici et sont partagés.
+/// Coquille de l'espace coach : dashboard / élèves / créer une séance / messages.
+/// Les streams (élèves, séances assignées, conversations) vivent ici et sont partagés.
 class CoachShell extends StatefulWidget {
   const CoachShell({super.key});
 
@@ -56,6 +59,9 @@ class _CoachShellState extends State<CoachShell> {
   int _index = 0;
   StreamSubscription<List<AppUser>>? _studentsSub;
   StreamSubscription<List<SessionModel>>? _sessionsSub;
+  StreamSubscription<List<ChatThread>>? _threadsSub;
+  Map<String, ChatThread> _threads = const {};
+  Object? _threadsError;
   List<AppUser> _students = const [];
   List<SessionModel> _sessions = const [];
   bool _studentsLoaded = false;
@@ -93,11 +99,20 @@ class _CoachShellState extends State<CoachShell> {
         _sessionsLoaded = true;
       }),
     );
+    _threadsSub = ChatService().watchCoachThreads(uid).listen(
+      (list) => setState(() {
+        _threads = {for (final t in list) t.studentId: t};
+        _threadsError = null;
+      }),
+      onError: (Object e) => setState(() => _threadsError = e),
+    );
   }
 
   void _retry() {
     _studentsSub?.cancel();
     _sessionsSub?.cancel();
+    _threadsSub?.cancel();
+    _threadsError = null;
     setState(() {
       _studentsLoaded = false;
       _sessionsLoaded = false;
@@ -113,6 +128,7 @@ class _CoachShellState extends State<CoachShell> {
   void dispose() {
     _studentsSub?.cancel();
     _sessionsSub?.cancel();
+    _threadsSub?.cancel();
     super.dispose();
   }
 
@@ -138,17 +154,41 @@ class _CoachShellState extends State<CoachShell> {
       _CoachDashboardTab(data: data, onOpenTab: _openTab, onRetry: _retry),
       _CoachStudentsTab(data: data, onRetry: _retry),
       CoachCreateSessionForm(students: active),
+      CoachMessagesTab(
+        coach: me,
+        students: active,
+        threads: _threads,
+        error: _threadsError,
+        onRetry: _retry,
+      ),
     ];
+    // Non-lus des élèves actifs uniquement (badge de l'onglet Messages).
+    final unread = active.fold<int>(0, (n, s) => n + (_threads[s.uid]?.unreadForCoach ?? 0));
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(child: IndexedStack(index: _index, children: tabs)),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: _openTab,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'Dashboard'),
-          NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups), label: 'Élèves'),
-          NavigationDestination(icon: Icon(Icons.edit_outlined), selectedIcon: Icon(Icons.edit), label: 'Créer'),
+        destinations: [
+          const NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'Dashboard'),
+          const NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups), label: 'Élèves'),
+          const NavigationDestination(icon: Icon(Icons.edit_outlined), selectedIcon: Icon(Icons.edit), label: 'Créer'),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: unread > 0,
+              label: Text(unread > 99 ? '99+' : '$unread'),
+              backgroundColor: AppColors.accent,
+              child: const Icon(Icons.chat_bubble_outline_rounded),
+            ),
+            selectedIcon: Badge(
+              isLabelVisible: unread > 0,
+              label: Text(unread > 99 ? '99+' : '$unread'),
+              backgroundColor: AppColors.accent,
+              child: const Icon(Icons.chat_bubble_rounded),
+            ),
+            label: 'Messages',
+          ),
         ],
       ),
     );

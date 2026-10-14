@@ -3,6 +3,7 @@ import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/cartes.dart';
 import '../widgets/current_user_scope.dart';
+import 'chat_screen.dart';
 
 class ProfilScreen extends StatelessWidget {
   const ProfilScreen({super.key});
@@ -53,6 +54,11 @@ class ProfilScreen extends StatelessWidget {
         ],
         const SectionLabel('Mon coach'),
         AppCard(
+          onTap: user.coachId == null
+              ? null
+              : () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => ChatScreen(student: user, coachUid: user.coachId!, coachName: user.coachName),
+                  )),
           child: Row(
             children: [
               if (coachName != null && coachName.isNotEmpty)
@@ -72,6 +78,7 @@ class ProfilScreen extends StatelessWidget {
                       )
                     : const Text('Aucun coach assigné pour le moment', style: TextStyle(color: AppColors.muted, fontSize: 13)),
               ),
+              if (user.coachId != null) const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.accent, size: 20),
             ],
           ),
         ),

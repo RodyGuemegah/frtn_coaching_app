@@ -9,9 +9,11 @@ import '../../utils/coach_stats.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
 import '../../widgets/cartes.dart';
+import '../../widgets/current_user_scope.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/tags.dart';
 import '../session_detail.dart';
+import '../chat_screen.dart';
 import '../sessions_screen.dart';
 import 'coach_add_student.dart';
 import 'coach_create_session.dart';
@@ -46,6 +48,20 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
         builder: (_) => CoachAddStudentScreen(initial: _student),
       ),
     );
+  }
+
+  /// Ouvre la conversation avec l'élève, éventuellement à propos d'une séance.
+  void _openChat({SessionModel? session}) {
+    final coach = CurrentUserScope.of(context);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ChatScreen(
+        student: _student,
+        coachUid: coach.uid,
+        coachName: coach.nameOrEmail,
+        sessionId: session?.id,
+        sessionTitle: session?.title,
+      ),
+    ));
   }
 
   /// Retire l'élève (archivage) après confirmation, ou le réactive.
@@ -302,7 +318,7 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
                   onValidate: last.feedbackValidated
                       ? null
                       : () => _validate(last),
-                  onReply: () => _snack('Messagerie bientôt disponible'),
+                  onReply: () => _openChat(session: last),
                 ),
               const SectionLabel('Séances'),
               if (snapshot.connectionState == ConnectionState.waiting &&
@@ -326,6 +342,11 @@ class _CoachStudentDetailScreenState extends State<CoachStudentDetailScreen> {
               ],
               if (!student.archived) ...[
                 const SectionLabel('Actions rapides'),
+                AppCard(
+                  onTap: () => _openChat(),
+                  child: _actionRow('💬', 'Messages', 'Écrire à ${student.shortName}'),
+                ),
+                const SizedBox(height: 10),
                 AppCard(
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
