@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/app_user.dart';
 import '../../models/session_model.dart';
 import '../../services/session_service.dart';
+import '../../services/user_service.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/errors.dart';
 import '../../utils/format.dart';
@@ -10,34 +11,63 @@ import '../../widgets/feedback.dart';
 import '../../widgets/current_user_scope.dart';
 import 'coach_add_student.dart';
 import 'template_picker.dart';
+import 'templates_screen.dart';
 import '../../theme/app_text.dart';
 
 /// Version « page » (route poussée, avec AppBar) du formulaire.
-/// Avec [initial], le formulaire passe en mode édition de cette séance.
+/// - [initial] : modification de cette séance ;
+/// - [prefill] : duplication (contenu copié, nouvelle séance) ;
+/// - [students] `null` : la liste des élèves actifs du coach est chargée ici.
 class CoachCreateSessionScreen extends StatelessWidget {
-  final List<AppUser> students;
+  final List<AppUser>? students;
   final String? preselectedStudentId;
   final SessionModel? initial;
+  final SessionModel? prefill;
 
-  const CoachCreateSessionScreen({super.key, required this.students, this.preselectedStudentId, this.initial});
+  const CoachCreateSessionScreen({
+    super.key,
+    this.students,
+    this.preselectedStudentId,
+    this.initial,
+    this.prefill,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final title = initial != null
+        ? 'Modifier la séance'
+        : (prefill != null ? 'Dupliquer la séance' : 'Nouvelle séance');
+    Widget form(List<AppUser> list) => CoachCreateSessionForm(
+          students: list,
+          preselectedStudentId: initial?.studentId ?? prefill?.studentId ?? preselectedStudentId,
+          initial: initial,
+          prefill: prefill,
+          showTitle: false,
+          onSubmitted: () => Navigator.of(context).pop(),
+        );
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.accent,
-        title: Text(AppText.upper(initial == null ? 'Nouvelle séance' : 'Modifier la séance')),
+        title: Text(AppText.upper(title)),
       ),
       body: SafeArea(
-        child: CoachCreateSessionForm(
-          students: students,
-          preselectedStudentId: initial?.studentId ?? preselectedStudentId,
-          initial: initial,
-          showTitle: false,
-          onSubmitted: () => Navigator.of(context).pop(),
-        ),
+        child: students != null
+            ? form(students!)
+            : StreamBuilder<List<AppUser>>(
+                stream: UserService().watchMyStudents(CurrentUserScope.of(context).uid),
+                builder: (context, snap) {
+                  if (snap.hasError) {
+                    return Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: ErrorCard(message: friendlyErrorMessage(snap.error!)),
+                    );
+                  }
+                  if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+                  return form(snap.data!.where((s) => !s.archived).toList());
+                },
+              ),
       ),
     );
   }
@@ -50,6 +80,9 @@ class CoachCreateSessionForm extends StatefulWidget {
 
   /// Séance à modifier ; `null` = création.
   final SessionModel? initial;
+
+  /// Séance à dupliquer : son contenu pré-remplit une NOUVELLE séance.
+  final SessionModel? prefill;
   final bool showTitle;
   final VoidCallback? onSubmitted;
 
@@ -58,6 +91,7 @@ class CoachCreateSessionForm extends StatefulWidget {
     required this.students,
     this.preselectedStudentId,
     this.initial,
+    this.prefill,
     this.showTitle = true,
     this.onSubmitted,
   });
@@ -82,13 +116,14 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
   void initState() {
     super.initState();
     _studentId = widget.preselectedStudentId;
-    final s = widget.initial;
+    final s = widget.initial ?? widget.prefill;
     if (s != null) {
       _studentId = s.studentId;
       _title.text = s.title;
       _duration.text = s.durationMin?.toString() ?? '';
       _note.text = s.coachNote ?? '';
-      _when = s.date;
+      // Duplication : même heure, une semaine plus tard (modifiable).
+      _when = widget.initial != null ? s.date : addDays(s.date, 7);
       _exercises.addAll(s.exercises);
     }
   }
@@ -159,15 +194,12 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
   }
 
   Future<void> _addExercise() async {
-    final ex = await showDialog<Exercise>(context: context, builder: (_) => const _ExerciseDialog());
+    final ex = await showExerciseDialog(context);
     if (ex != null) setState(() => _exercises.add(ex));
   }
 
   Future<void> _editExercise(int index) async {
-    final ex = await showDialog<Exercise>(
-      context: context,
-      builder: (_) => _ExerciseDialog(initial: _exercises[index]),
-    );
+    final ex = await showExerciseDialog(context, initial: _exercises[index]);
     if (ex != null) setState(() => _exercises[index] = ex);
   }
 
@@ -264,7 +296,24 @@ class _CoachCreateSessionFormState extends State<CoachCreateSessionForm> {
         ],
         if (!_editing) ...[
           const SizedBox(height: 14),
-          GhostButton(label: '📚 Partir d\'un modèle', onPressed: _applyTemplate),
+          Row(
+            children: [
+              Expanded(child: GhostButton(label: '📚 Partir d\'un modèle', onPressed: _applyTemplate)),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 50,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TemplatesScreen())),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: AppColors.card,
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Tooltip(message: 'Mes modèles', child: Icon(Icons.tune_rounded, color: AppColors.text, size: 20)),
+                ),
+              ),
+            ],
+          ),
         ],
         const _FieldLabel('Élève'),
         if (widget.students.isEmpty)
@@ -425,6 +474,10 @@ class _FieldLabel extends StatelessWidget {
     );
   }
 }
+
+/// Ouvre la saisie d'un exercice ; retourne l'exercice, ou `null` si annulé.
+Future<Exercise?> showExerciseDialog(BuildContext context, {Exercise? initial}) =>
+    showDialog<Exercise>(context: context, builder: (_) => _ExerciseDialog(initial: initial));
 
 /// Saisie d'un exercice (nom, séries, reps, charge, repos).
 class _ExerciseDialog extends StatefulWidget {

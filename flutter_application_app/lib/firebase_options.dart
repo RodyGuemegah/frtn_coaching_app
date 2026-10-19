@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyC0GXypbPWdDvSyAEPf6Llw2UexLng4c6M',
-    appId: '1:860489775317:android:84a2e7f9e70a1aeb918a5c',
+    appId: '1:860489775317:android:e17e4c03358a54e4918a5c',
     messagingSenderId: '860489775317',
     projectId: 'frtn-coaching-app',
     storageBucket: 'frtn-coaching-app.firebasestorage.app',
@@ -69,11 +69,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyD84c7iB99SPJBtHE2ZuWycz6kan8_k4AU',
-    appId: '1:860489775317:ios:54a7c39ae8888198918a5c',
+    appId: '1:860489775317:ios:2eedfff1ccd654cf918a5c',
     messagingSenderId: '860489775317',
     projectId: 'frtn-coaching-app',
     storageBucket: 'frtn-coaching-app.firebasestorage.app',
-    iosBundleId: 'com.example.flutterApplicationApp',
+    iosBundleId: 'com.rody.frtncoachingapp',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

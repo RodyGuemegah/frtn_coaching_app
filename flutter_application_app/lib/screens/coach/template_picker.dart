@@ -5,6 +5,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text.dart';
 import '../../utils/errors.dart';
 import '../../widgets/cartes.dart';
+import 'templates_screen.dart';
 
 /// Feuille du bas listant les modèles du coach.
 /// Retourne le modèle choisi, ou `null` si le coach ferme la feuille.
@@ -59,7 +60,18 @@ class _TemplatePickerState extends State<_TemplatePicker> {
                   icon: Icons.bookmark_border_rounded,
                 )
               else
-                for (final t in templates) _TemplateRow(template: t, onTap: () => Navigator.of(context).pop(t)),
+                for (final t in templates) TemplateRow(template: t, onTap: () => Navigator.of(context).pop(t)),
+              const SizedBox(height: 4),
+              TextButton.icon(
+                onPressed: () {
+                  // Navigateur capturé AVANT de fermer la feuille (son context devient invalide).
+                  final nav = Navigator.of(context);
+                  nav.pop();
+                  nav.push(MaterialPageRoute(builder: (_) => const TemplatesScreen()));
+                },
+                icon: const Icon(Icons.tune_rounded, size: 18),
+                label: const Text('Gérer mes modèles'),
+              ),
             ],
           );
         },
@@ -68,10 +80,11 @@ class _TemplatePickerState extends State<_TemplatePicker> {
   }
 }
 
-class _TemplateRow extends StatelessWidget {
+/// Ligne d'un modèle (titre, nombre d'exercices, durée). Réutilisée par « Mes modèles ».
+class TemplateRow extends StatelessWidget {
   final SessionTemplate template;
   final VoidCallback onTap;
-  const _TemplateRow({required this.template, required this.onTap});
+  const TemplateRow({super.key, required this.template, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

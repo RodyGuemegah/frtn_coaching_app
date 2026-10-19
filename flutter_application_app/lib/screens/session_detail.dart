@@ -57,6 +57,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     ));
   }
 
+  /// « Dupliquer » : nouvelle séance au même contenu, une semaine plus tard,
+  /// pour le même élève ou un autre (choix dans le formulaire).
+  void _duplicate() {
+    final s = _latest;
+    if (s == null) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => CoachCreateSessionScreen(prefill: s),
+    ));
+  }
+
   /// « Enregistrer comme modèle » : copie le contenu de la séance dans la
   /// bibliothèque de modèles du coach, sous un nom choisi.
   Future<void> _saveAsTemplate() async {
@@ -186,6 +196,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
               icon: const Icon(Icons.more_vert),
               onSelected: (v) => switch (v) {
                 'edit' => _edit(),
+                'duplicate' => _duplicate(),
                 'template' => _saveAsTemplate(),
                 _ => _delete(),
               },
@@ -193,6 +204,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 PopupMenuItem(
                   value: 'edit',
                   child: Row(children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 10), Text('Modifier')]),
+                ),
+                PopupMenuItem(
+                  value: 'duplicate',
+                  child: Row(children: [Icon(Icons.copy_all_outlined, size: 18), SizedBox(width: 10), Text('Dupliquer')]),
                 ),
                 PopupMenuItem(
                   value: 'template',
