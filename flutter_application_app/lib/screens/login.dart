@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_text.dart';
 import '../widgets/cartes.dart';
 import '../widgets/feedback.dart';
 
@@ -84,18 +83,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 12),
                       _buildLogo(),
-                      const SizedBox(height: 18),
-                      Text.rich(
-                        TextSpan(children: [
-                          const TextSpan(text: 'FRTN '),
-                          TextSpan(text: AppText.upper('Coaching'), style: const TextStyle(color: AppColors.accent)),
-                        ]),
-                        textAlign: TextAlign.center,
-                        style: AppText.screenTitle.copyWith(fontSize: 36),
-                      ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 10),
                       Text(
                         'Connecte-toi pour retrouver ton programme',
                         textAlign: TextAlign.center,
@@ -135,23 +125,19 @@ class _LoginScreenState extends State<LoginScreen> {
     ),
   );
 
+  /// Logo officiel FRTN Coaching (bouclier, monogramme « FR », éclair).
+  /// Le fondu vers le fond de l'écran (#0A0A0C) est intégré à l'image.
   Widget _buildLogo() {
     return Center(
-      child: Container(
-        width: 72,
-        height: 72,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: const LinearGradient(
-            colors: [AppColors.accent, AppColors.accentDark],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(color: AppColors.accentDark.withValues(alpha: 0.4), blurRadius: 24, offset: const Offset(0, 10)),
-          ],
+      child: Semantics(
+        label: 'FRTN Coaching',
+        image: true,
+        child: Image.asset(
+          'assets/images/logo_frtn.jpg',
+          height: 290,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.medium,
         ),
-        child: const Icon(Icons.fitness_center_rounded, color: Colors.white, size: 34),
       ),
     );
   }

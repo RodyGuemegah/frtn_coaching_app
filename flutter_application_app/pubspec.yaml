@@ -63,6 +63,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Logo officiel FRTN (écran de connexion). La source haute définition est dans assets/images/logo_frtn_source.jpg.
+  assets:
+    - assets/images/logo_frtn.jpg
+
   # Charte typographique FRTN (licences OFL dans assets/fonts/).
   # - Barlow Condensed : titres, boutons, chiffres (italique extra-gras, façon maquette)
   # - Inter : textes courants
@@ -129,7 +133,7 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# Icône de l'app (logo FRTN : haltère blanc sur dégradé rouge).
+# Icône de l'app : monogramme « FR » + « FRTN » du logo officiel (assets/images/logo_frtn_source.jpg).
 # Source : assets/icon/ — régénérer avec : dart run flutter_launcher_icons
 flutter_launcher_icons:
   image_path: "assets/icon/app_icon.png"
