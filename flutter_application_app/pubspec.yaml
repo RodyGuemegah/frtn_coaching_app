@@ -51,6 +51,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.8
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -148,3 +149,17 @@ flutter_launcher_icons:
     generate: true
     background_color: "#0A0A0C"
     theme_color: "#E8192C"
+
+# Écran de démarrage natif (logo FRTN sur le noir de l'app).
+# Régénérer avec : dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#0A0A0C"
+  image: assets/images/splash_logo.png
+  android_12:
+    color: "#0A0A0C"
+    image: assets/images/splash_android12.png
+    icon_background_color: "#0A0A0C"
+  ios: true
+  android: true
+  web: true
+  fullscreen: false

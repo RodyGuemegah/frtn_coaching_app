@@ -154,12 +154,46 @@ class _RoleGateState extends State<RoleGate> {
   }
 }
 
+/// Écran de chargement (connexion / profil en cours de vérification).
+/// Reprend l'écran de démarrage natif à l'identique — même fond, logo centré
+/// à la même taille — pour que le passage de l'un à l'autre soit invisible.
 class _Splash extends StatelessWidget {
   const _Splash();
 
+  /// Largeur du logo sur l'écran natif : splash_logo.png (720 px) est traité
+  /// par flutter_native_splash comme une image @4x → 180 points.
+  static const _logoWidth = 180.0;
+
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          Center(
+            child: Image.asset(
+              'assets/images/logo_frtn.jpg',
+              width: _logoWidth,
+              filterQuality: FilterQuality.medium,
+              semanticLabel: 'FRTN Coaching',
+            ),
+          ),
+          // Indicateur discret en bas : il ne décale pas le logo.
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 72,
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.2, color: AppColors.accent),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
