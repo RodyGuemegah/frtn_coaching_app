@@ -25,6 +25,7 @@ import 'coach_add_student.dart';
 import 'coach_create_session.dart';
 import 'coach_meal_plan.dart';
 import 'program_editor.dart';
+import 'program_report_screen.dart';
 
 /// Fiche élève côté coach : stats, dernier retour, séances, actions rapides.
 class CoachStudentDetailScreen extends StatefulWidget {
@@ -562,6 +563,12 @@ class _ProgramSection extends StatefulWidget {
 class _ProgramSectionState extends State<_ProgramSection> {
   late final Stream<List<Program>> _stream = ProgramService().watchPrograms(widget.student.uid);
 
+  void _openReport(Program program) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ProgramReportScreen(student: widget.student, program: program),
+    ));
+  }
+
   void _open({Program? initial}) {
     showProgramEditor(
       context,
@@ -605,6 +612,16 @@ class _ProgramSectionState extends State<_ProgramSection> {
               needsRenewalFlag: renew,
               onTap: archived ? null : () => _open(initial: current),
             ),
+            // Bilan disponible dès que le programme a commencé.
+            if (programStatus(current, now) != ProgramStatus.upcoming) ...[
+              const SizedBox(height: 10),
+              GhostButton(
+                label: programStatus(current, now) == ProgramStatus.finished
+                    ? '📊 Voir le bilan du programme'
+                    : '📊 Bilan intermédiaire',
+                onPressed: () => _openReport(current),
+              ),
+            ],
             if (!archived) ...[
               const SizedBox(height: 10),
               if (renew)
@@ -615,18 +632,58 @@ class _ProgramSectionState extends State<_ProgramSection> {
               else
                 GhostButton(label: '+ Nouveau programme', onPressed: () => _open()),
             ],
+            // Historique : les autres programmes, du plus récent au plus ancien.
             if (programs.length > 1) ...[
-              const SizedBox(height: 6),
-              Text(
-                '${programs.length - 1} autre${programs.length > 2 ? 's' : ''} programme${programs.length > 2 ? 's' : ''} '
-                'dans l\'historique',
-                style: AppText.caption,
-                textAlign: TextAlign.center,
-              ),
+              const SizedBox(height: 14),
+              Text(AppText.upper('Historique des programmes'), style: AppText.section),
+              const SizedBox(height: 8),
+              for (final p in (programs.where((p) => p.id != current.id).toList()
+                ..sort((a, b) => b.startDate.compareTo(a.startDate))))
+                _PastProgramRow(
+                  program: p,
+                  onTap: programStatus(p, now) == ProgramStatus.upcoming ? () => _open(initial: p) : () => _openReport(p),
+                ),
             ],
           ],
         );
       },
+    );
+  }
+}
+
+/// Ligne d'un programme passé (ou à venir) dans l'historique de la fiche élève.
+class _PastProgramRow extends StatelessWidget {
+  final Program program;
+  final VoidCallback onTap;
+  const _PastProgramRow({required this.program, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = program;
+    final upcoming = programStatus(p, DateTime.now()) == ProgramStatus.upcoming;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(upcoming ? Icons.event_outlined : Icons.insights_rounded, size: 20, color: AppColors.muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(p.title, style: AppText.itemTitle.copyWith(fontSize: 14)),
+                  Text('${formatDate(p.startDate)} → ${formatDate(p.lastDay)} · ${p.weeks} sem.', style: AppText.caption),
+                ],
+              ),
+            ),
+            Text(upcoming ? 'À venir' : 'Bilan', style: AppText.caption.copyWith(color: AppColors.accent2)),
+            const Icon(Icons.chevron_right, color: AppColors.muted),
+          ],
+        ),
+      ),
     );
   }
 }
